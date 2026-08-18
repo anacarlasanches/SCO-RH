@@ -5232,7 +5232,10 @@ const SUPA_URL = 'https://ywqtjukvqejxmgpuaemz.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3cXRqdWt2cWVqeG1ncHVhZW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNzE2NDUsImV4cCI6MjEwMjY0NzY0NX0.tLG_TgEkezvYkoIBBkgxdLuHkijBfY4rMCYumkzoIjI';
 const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 
+var _syncando = false;
 async function syncToSupabase(){
+  if(_syncando) return;
+  _syncando = true;
   try {
     // Salvar funcionarios
     const funcsData = funcionarios.map(f => ({id: f.id, dados: f}));
@@ -5264,6 +5267,8 @@ async function syncToSupabase(){
     console.log('✅ Sincronizado com Supabase');
   } catch(e) {
     console.warn('Supabase sync error:', e);
+  } finally {
+    setTimeout(function(){_syncando = false;}, 2000);
   }
 }
 
@@ -5359,7 +5364,7 @@ function iniciarRealtime(){
 
 var _recarregando = false;
 function recarregarDados(){
-  if(_recarregando) return;
+  if(_recarregando || _syncando) return;
   _recarregando = true;
   setTimeout(function(){
     loadFromSupabaseSilent();
