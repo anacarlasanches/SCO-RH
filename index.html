@@ -965,7 +965,16 @@ let funcionarios=JSON.parse(localStorage.getItem('rt_funcs')||'[]');
 let lancamentos=JSON.parse(localStorage.getItem('rt_lancs')||'[]');
 let departamentos=JSON.parse(localStorage.getItem('rt_deptos')||'null');
 let metas=JSON.parse(localStorage.getItem('rt_metas')||'[]');
-function saveMetas(){localStorage.setItem('rt_metas',JSON.stringify(metas));syncToSupabase();}
+function saveMetas(){
+  localStorage.setItem('rt_metas',JSON.stringify(metas));
+  // Sincronizar metas: deletar todas e reinserir
+  try{
+    supa.from('metas').delete().neq('id','_').then(function(){
+      var metasData=metas.map(function(m){return {id:m.id,dados:m};});
+      if(metasData.length)supa.from('metas').upsert(metasData).then(function(){});
+    });
+  }catch(e){console.warn(e);}
+}
 if(!departamentos) departamentos=['Tecnologia','Recursos Humanos','Financeiro','Comercial','Operações','Marketing','Jurídico'];
 let csvDados=[];
 
@@ -1623,7 +1632,15 @@ function renderRelatorio(){
   }
   tbody.innerHTML=rows;
 }
-function removeLanc(id){if(!confirm('Remover?'))return;lancamentos=lancamentos.filter(l=>l.id!==id);save();renderRelatorio();toast('Removido.');}
+function removeLanc(id){
+  if(!confirm('Remover?'))return;
+  lancamentos=lancamentos.filter(l=>l.id!==id);
+  save();
+  // Deletar também no Supabase
+  try{supa.from('lancamentos').delete().eq('id',id).then(function(){console.log('Lançamento deletado do Supabase');});}catch(e){console.warn(e);}
+  renderRelatorio();
+  toast('Removido.');
+}
 function reconectarOrfaos(){
   // Acha lançamentos cujo funcId não existe mais no cadastro
   const orfaos=lancamentos.filter(function(l){
@@ -4913,7 +4930,9 @@ function excluirTreinamento(id){
   if(!t)return;
   if(!confirm('Excluir treinamento "'+t.nome+'"?'))return;
   treinamentos=treinamentos.filter(function(x){return x.id!==id;});
-  saveTreinamentos();renderTreinamentos();toast('Treinamento excluído.');
+  saveTreinamentos();
+  try{supa.from('treinamentos').delete().eq('id',id).then(function(){});}catch(e){}
+  renderTreinamentos();toast('Treinamento excluído.');
 }
 
 function renderTreinamentos(){
