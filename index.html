@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SCO Gente &amp; Gestão</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
@@ -5221,10 +5222,131 @@ function salvarPagamentoFerias(){
   toast('✅ Pagamento confirmado! Lançamento criado em '+MESES[mesP]+'/'+anoP+'.');
 }
 
+
+// ===== SUPABASE SYNC =====
+const SUPA_URL = 'https://ywqtjukvqejxmgpuaemz.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3cXRqdWt2cWVqeG1ncHVhZW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNzE2NDUsImV4cCI6MjEwMjY0NzY0NX0.tLG_TgEkezvYkoIBBkgxdLuHkijBfY4rMCYumkzoIjI';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+async function syncToSupabase(){
+  try {
+    // Salvar funcionarios
+    const funcsData = funcionarios.map(f => ({id: f.id, dados: f}));
+    if(funcsData.length) await supa.from('funcionarios').upsert(funcsData);
+    
+    // Salvar lancamentos
+    const lancsData = lancamentos.map(l => ({id: l.id, dados: l}));
+    if(lancsData.length) await supa.from('lancamentos').upsert(lancsData);
+    
+    // Salvar metas
+    const metasData = metas.map(m => ({id: m.id, dados: m}));
+    if(metasData.length) await supa.from('metas').upsert(metasData);
+    
+    // Salvar avaliacoes
+    const avsData = avaliacoes.map(a => ({id: a.id, dados: a}));
+    if(avsData.length) await supa.from('avaliacoes').upsert(avsData);
+    
+    // Salvar treinamentos
+    const treisData = treinamentos.map(t => ({id: t.id, dados: t}));
+    if(treisData.length) await supa.from('treinamentos').upsert(treisData);
+    
+    // Salvar historico
+    const histData = historico.map(h => ({id: h.id, dados: h}));
+    if(histData.length) await supa.from('historico_salarial').upsert(histData);
+    
+    // Salvar departamentos
+    await supa.from('configuracoes').upsert([{chave: 'departamentos', valor: departamentos}]);
+    
+    console.log('✅ Sincronizado com Supabase');
+  } catch(e) {
+    console.warn('Supabase sync error:', e);
+  }
+}
+
+async function loadFromSupabase(){
+  try {
+    toast('🔄 Carregando dados da nuvem...');
+    
+    const [fRes, lRes, mRes, aRes, tRes, hRes, cRes] = await Promise.all([
+      supa.from('funcionarios').select('dados'),
+      supa.from('lancamentos').select('dados'),
+      supa.from('metas').select('dados'),
+      supa.from('avaliacoes').select('dados'),
+      supa.from('treinamentos').select('dados'),
+      supa.from('historico_salarial').select('dados'),
+      supa.from('configuracoes').select('chave,valor').eq('chave','departamentos')
+    ]);
+    
+    if(fRes.data && fRes.data.length) {
+      funcionarios = fRes.data.map(r => r.dados);
+      localStorage.setItem('rt_funcs', JSON.stringify(funcionarios));
+    }
+    if(lRes.data && lRes.data.length) {
+      lancamentos = lRes.data.map(r => r.dados);
+      localStorage.setItem('rt_lancs', JSON.stringify(lancamentos));
+    }
+    if(mRes.data && mRes.data.length) {
+      metas = mRes.data.map(r => r.dados);
+      localStorage.setItem('rt_metas', JSON.stringify(metas));
+    }
+    if(aRes.data && aRes.data.length) {
+      avaliacoes = aRes.data.map(r => r.dados);
+      localStorage.setItem('rt_avaliacoes', JSON.stringify(avaliacoes));
+    }
+    if(tRes.data && tRes.data.length) {
+      treinamentos = tRes.data.map(r => r.dados);
+      localStorage.setItem('rt_treinamentos', JSON.stringify(treinamentos));
+    }
+    if(hRes.data && hRes.data.length) {
+      historico = hRes.data.map(r => r.dados);
+      localStorage.setItem('rt_hist_sal', JSON.stringify(historico));
+    }
+    if(cRes.data && cRes.data.length) {
+      departamentos = cRes.data[0].valor;
+      localStorage.setItem('rt_deptos', JSON.stringify(departamentos));
+    }
+    
+    // Re-renderizar tudo
+    try{renderDashboard();}catch(e){}
+    try{renderFuncionarios();}catch(e){}
+    try{populateDeptoSelect();}catch(e){}
+    
+    toast('✅ Dados carregados da nuvem!');
+    console.log('✅ Dados carregados do Supabase');
+  } catch(e) {
+    console.warn('Supabase load error:', e);
+    toast('⚠️ Erro ao carregar da nuvem. Usando dados locais.');
+  }
+}
+
+// Interceptar save() para também sincronizar com Supabase
+const _savePure = save;
+function save(){
+  _savePure();
+  syncToSupabase();
+}
+const _saveMetasPure = saveMetas;
+function saveMetas(){
+  localStorage.setItem('rt_metas', JSON.stringify(metas));
+  syncToSupabase();
+}
+const _saveAvPure = saveAvaliacoes;
+function saveAvaliacoes(){
+  localStorage.setItem('rt_avaliacoes', JSON.stringify(avaliacoes));
+  syncToSupabase();
+}
+const _saveTreiPure = saveTreinamentos;
+function saveTreinamentos(){
+  localStorage.setItem('rt_treinamentos', JSON.stringify(treinamentos));
+  syncToSupabase();
+}
+
 try{initSelects();}catch(e){console.warn(e);}
 try{populateDeptoSelect();}catch(e){console.warn(e);}
 try{renderFuncionarios();}catch(e){console.warn(e);}
 try{renderDashboard();}catch(e){console.warn(e);}
+// Carregar dados do Supabase ao iniciar
+setTimeout(function(){loadFromSupabase();}, 500);
 </script>
 
 <div id="page-relatorios" class="page">
