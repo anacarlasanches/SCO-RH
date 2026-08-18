@@ -1502,18 +1502,17 @@ function salvarLancamento(){
 
 function limparForm(){
   CAMPOS.forEach(c=>{const el=document.getElementById(c.id);if(el)el.value='';});
-  document.getElementById('l-obs').value='';
-  document.getElementById('l-obs-extras').value='';
-  document.getElementById('l-func').disabled=false;
-  document.getElementById('l-mes').disabled=false;
-  document.getElementById('l-ano').disabled=false;
-  const btn=document.getElementById('btn-salvar-lanc');
-  btn.textContent='💾 Salvar lançamento';
-  btn.dataset.editId='';btn.dataset.funcId='';btn.dataset.mes='';btn.dataset.ano='';
-  document.getElementById('btn-cancelar-edit').style.display='none';
-  document.getElementById('lanc-title').textContent='Lançamento Manual';
-  document.getElementById('lanc-sub').textContent='Adicione ou edite valores por colaborador e mês';
-  calcResumo();
+  var eObs=document.getElementById('l-obs');if(eObs)eObs.value='';
+  var eObsX=document.getElementById('l-obs-extras');if(eObsX)eObsX.value='';
+  var eFunc=document.getElementById('l-func');if(eFunc)eFunc.disabled=false;
+  var eMes=document.getElementById('l-mes');if(eMes)eMes.disabled=false;
+  var eAno=document.getElementById('l-ano');if(eAno)eAno.disabled=false;
+  var btn=document.getElementById('btn-salvar-lanc');
+  if(btn){btn.textContent='💾 Salvar lançamento';btn.dataset.editId='';btn.dataset.funcId='';btn.dataset.mes='';btn.dataset.ano='';}
+  var eBtnCan=document.getElementById('btn-cancelar-edit');if(eBtnCan)eBtnCan.style.display='none';
+  var eTitle=document.getElementById('lanc-title');if(eTitle)eTitle.textContent='Lançamento Manual';
+  var eSub=document.getElementById('lanc-sub');if(eSub)eSub.textContent='Adicione ou edite valores por colaborador e mês';
+  try{calcResumo();}catch(e){}
 }
 function cancelarEdicao(){limparForm();}
 
