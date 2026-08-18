@@ -965,7 +965,7 @@ let funcionarios=JSON.parse(localStorage.getItem('rt_funcs')||'[]');
 let lancamentos=JSON.parse(localStorage.getItem('rt_lancs')||'[]');
 let departamentos=JSON.parse(localStorage.getItem('rt_deptos')||'null');
 let metas=JSON.parse(localStorage.getItem('rt_metas')||'[]');
-function saveMetas(){localStorage.setItem('rt_metas',JSON.stringify(metas));}
+function saveMetas(){localStorage.setItem('rt_metas',JSON.stringify(metas));syncToSupabase();}
 if(!departamentos) departamentos=['Tecnologia','Recursos Humanos','Financeiro','Comercial','Operações','Marketing','Jurídico'];
 let csvDados=[];
 
@@ -1030,6 +1030,7 @@ function save(){
   localStorage.setItem('rt_funcs',JSON.stringify(funcionarios));
   localStorage.setItem('rt_lancs',JSON.stringify(lancamentos));
   localStorage.setItem('rt_deptos',JSON.stringify(departamentos));
+  syncToSupabase();
 }
 function toast(msg,ok=true){
   const t=document.getElementById('toast');
@@ -4102,7 +4103,7 @@ function exportarRelatoriosExcel(){
 
 // ===== AVALIACOES =====
 var avaliacoes=JSON.parse(localStorage.getItem('rt_avaliacoes')||'[]');
-function saveAvaliacoes(){localStorage.setItem('rt_avaliacoes',JSON.stringify(avaliacoes));}
+function saveAvaliacoes(){localStorage.setItem('rt_avaliacoes',JSON.stringify(avaliacoes));syncToSupabase();}
 var AV_COMP=['Comunicacao Interpessoal','Trabalho em Equipe','Proatividade','Organizacao e Planejamento','Resolucao de Conflitos','Adaptabilidade','Foco em Resultados','Etica e Comprometimento'];
 var AV_TEC=['Dominio das Ferramentas e Sistemas','Qualidade das Entregas','Conhecimento do Processo','Analise de Dados e Relatorios','Documentacao e Registros','Uso de IA e Automacao','Conhecimento Tecnico Especifico','Resolucao de Problemas'];
 var AV_PERF=[{l:'Cumprimento de Metas',p:0.20},{l:'Qualidade das Entregas',p:0.15},{l:'Prazo e Pontualidade',p:0.15},{l:'Produtividade',p:0.15},{l:'Iniciativa e Proatividade',p:0.10},{l:'Satisfacao de Clientes',p:0.10},{l:'Gestao de Recursos e Tempo',p:0.10},{l:'Impacto nos Resultados',p:0.05}];
@@ -4776,7 +4777,7 @@ function handleXLSXFeriasCompleto(file){
 
 // ===== TREINAMENTOS =====
 var treinamentos=JSON.parse(localStorage.getItem('rt_treinamentos')||'[]');
-function saveTreinamentos(){localStorage.setItem('rt_treinamentos',JSON.stringify(treinamentos));}
+function saveTreinamentos(){localStorage.setItem('rt_treinamentos',JSON.stringify(treinamentos));syncToSupabase();}
 
 var _treiPartsSelecionados=[];
 
@@ -5322,27 +5323,8 @@ async function loadFromSupabase(){
   }
 }
 
-// Interceptar save() para também sincronizar com Supabase
-const _savePure = save;
-function save(){
-  _savePure();
-  syncToSupabase();
-}
-const _saveMetasPure = saveMetas;
-function saveMetas(){
-  localStorage.setItem('rt_metas', JSON.stringify(metas));
-  syncToSupabase();
-}
-const _saveAvPure = saveAvaliacoes;
-function saveAvaliacoes(){
-  localStorage.setItem('rt_avaliacoes', JSON.stringify(avaliacoes));
-  syncToSupabase();
-}
-const _saveTreiPure = saveTreinamentos;
-function saveTreinamentos(){
-  localStorage.setItem('rt_treinamentos', JSON.stringify(treinamentos));
-  syncToSupabase();
-}
+// Sync automático via Supabase (chamado após cada save)
+// Versão sem loop infinito - usa flag para evitar recursão
 
 
 function iniciarRealtime(){
