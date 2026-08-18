@@ -1489,9 +1489,12 @@ function salvarLancamento(){
   }
   // Registrar histórico
   const userTag='['+new Date().toLocaleString('pt-BR')+']';
-  if(!novoLanc.historico)novoLanc.historico=[];
-  if(idEdit){novoLanc.historico.push(userTag+' Editado');}
-  else{novoLanc.historico.push(userTag+' Criado');}
+  const lancAtual=lancamentos[lancamentos.length-1];
+  if(lancAtual){
+    if(!lancAtual.historico)lancAtual.historico=[];
+    if(idEdit){lancAtual.historico.push(userTag+' Editado');}
+    else{lancAtual.historico.push(userTag+' Criado');}
+  }
   save();limparForm();
   fecharModalLancamento();
 }
@@ -5341,12 +5344,115 @@ function saveTreinamentos(){
   syncToSupabase();
 }
 
+
+function iniciarRealtime(){
+  try {
+    var channel = supa.channel('sco-sync')
+      .on('postgres_changes', {event:'*', schema:'public', table:'funcionarios'}, function(){
+        recarregarDados();
+      })
+      .on('postgres_changes', {event:'*', schema:'public', table:'lancamentos'}, function(){
+        recarregarDados();
+      })
+      .on('postgres_changes', {event:'*', schema:'public', table:'metas'}, function(){
+        recarregarDados();
+      })
+      .on('postgres_changes', {event:'*', schema:'public', table:'avaliacoes'}, function(){
+        recarregarDados();
+      })
+      .on('postgres_changes', {event:'*', schema:'public', table:'treinamentos'}, function(){
+        recarregarDados();
+      })
+      .on('postgres_changes', {event:'*', schema:'public', table:'historico_salarial'}, function(){
+        recarregarDados();
+      })
+      .subscribe(function(status){
+        console.log('Realtime:', status);
+      });
+    console.log('✅ Realtime iniciado');
+  } catch(e) {
+    console.warn('Realtime error:', e);
+  }
+}
+
+var _recarregando = false;
+function recarregarDados(){
+  if(_recarregando) return;
+  _recarregando = true;
+  setTimeout(function(){
+    loadFromSupabaseSilent();
+    _recarregando = false;
+  }, 1000);
+}
+
+async function loadFromSupabaseSilent(){
+  try {
+    var pagAtual = document.querySelector('.page.active');
+    var pagId = pagAtual ? pagAtual.id : '';
+
+    const [fRes, lRes, mRes, aRes, tRes, hRes] = await Promise.all([
+      supa.from('funcionarios').select('dados'),
+      supa.from('lancamentos').select('dados'),
+      supa.from('metas').select('dados'),
+      supa.from('avaliacoes').select('dados'),
+      supa.from('treinamentos').select('dados'),
+      supa.from('historico_salarial').select('dados')
+    ]);
+
+    if(fRes.data && fRes.data.length){
+      funcionarios = fRes.data.map(function(r){return r.dados;});
+      localStorage.setItem('rt_funcs', JSON.stringify(funcionarios));
+    }
+    if(lRes.data && lRes.data.length){
+      lancamentos = lRes.data.map(function(r){return r.dados;});
+      localStorage.setItem('rt_lancs', JSON.stringify(lancamentos));
+    }
+    if(mRes.data && mRes.data.length){
+      metas = mRes.data.map(function(r){return r.dados;});
+      localStorage.setItem('rt_metas', JSON.stringify(metas));
+    }
+    if(aRes.data && aRes.data.length){
+      avaliacoes = aRes.data.map(function(r){return r.dados;});
+      localStorage.setItem('rt_avaliacoes', JSON.stringify(avaliacoes));
+    }
+    if(tRes.data && tRes.data.length){
+      treinamentos = tRes.data.map(function(r){return r.dados;});
+      localStorage.setItem('rt_treinamentos', JSON.stringify(treinamentos));
+    }
+    if(hRes.data && hRes.data.length){
+      historico = hRes.data.map(function(r){return r.dados;});
+      localStorage.setItem('rt_hist_sal', JSON.stringify(historico));
+    }
+
+    // Re-renderizar a página atual
+    try{
+      if(pagId==='page-dashboard') renderDashboard();
+      else if(pagId==='page-funcionarios') renderFuncionarios();
+      else if(pagId==='page-ferias-ctrl') renderFeriasCtrl();
+      else if(pagId==='page-metas') renderMetas();
+      else if(pagId==='page-alertas') renderAlertas();
+      else if(pagId==='page-rh') renderRH();
+      else if(pagId==='page-historico') renderHistorico();
+      else if(pagId==='page-relatorios') renderRelatorios();
+      else if(pagId==='page-avaliacoes') renderAvaliacoes();
+      else renderDashboard();
+    }catch(e){}
+    console.log('✅ Dados atualizados via Realtime');
+  } catch(e) {
+    console.warn('Realtime load error:', e);
+  }
+}
+
 try{initSelects();}catch(e){console.warn(e);}
 try{populateDeptoSelect();}catch(e){console.warn(e);}
 try{renderFuncionarios();}catch(e){console.warn(e);}
 try{renderDashboard();}catch(e){console.warn(e);}
 // Carregar dados do Supabase ao iniciar
-setTimeout(function(){loadFromSupabase();}, 500);
+setTimeout(function(){
+  loadFromSupabase();
+  // Iniciar Realtime após carregar
+  setTimeout(function(){iniciarRealtime();}, 2000);
+}, 500);
 </script>
 
 <div id="page-relatorios" class="page">
