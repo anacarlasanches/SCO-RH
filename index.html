@@ -155,6 +155,26 @@ tbody tr:last-child td{border-bottom:none;}
 
 <!-- DASHBOARD -->
 <!-- Modal Programar Férias -->
+<!-- Tela de Login -->
+<div id="tela-login" style="display:none;position:fixed;inset:0;background:#eef1fa;z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:20px;padding:40px;max-width:400px;width:90%;box-shadow:0 8px 40px rgba(17,32,91,0.15);text-align:center;">
+    <div style="font-size:48px;margin-bottom:8px;">🏢</div>
+    <div style="font-size:22px;font-weight:800;color:#11205b;margin-bottom:4px;">SCO Gente & Gestão</div>
+    <div style="font-size:13px;color:#888;margin-bottom:32px;">Faça login para continuar</div>
+    <div style="text-align:left;margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">E-mail</label>
+      <input id="login-email" type="email" placeholder="seu@email.com" style="width:100%;padding:10px 14px;border:1px solid #d5daea;border-radius:10px;font-size:14px;box-sizing:border-box;outline:none;"/>
+    </div>
+    <div style="text-align:left;margin-bottom:24px;">
+      <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Senha</label>
+      <input id="login-senha" type="password" placeholder="••••••••" style="width:100%;padding:10px 14px;border:1px solid #d5daea;border-radius:10px;font-size:14px;box-sizing:border-box;outline:none;"/>
+    </div>
+    <div id="login-erro" style="display:none;background:#fff0f0;border:1px solid #fca5a5;border-radius:8px;padding:10px;font-size:13px;color:#dc2626;margin-bottom:16px;"></div>
+    <button id="btn-login" onclick="fazerLogin()" style="width:100%;padding:12px;background:#f94603;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">Entrar</button>
+    <div style="margin-top:12px;font-size:11px;color:#aaa;">SCO © 2026</div>
+  </div>
+</div>
+
 <div id="modal-programar-ferias" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:16px;max-width:560px;width:95%;max-height:90vh;overflow-y:auto;">
     <div class="modal-header">
@@ -5448,15 +5468,94 @@ async function loadFromSupabaseSilent(){
   }
 }
 
+
+// ===== AUTENTICAÇÃO =====
+async function verificarSessao(){
+  try {
+    var session = await supa.auth.getSession();
+    if(session && session.data && session.data.session){
+      // Usuário logado
+      document.getElementById('tela-login').style.display='none';
+      var user = session.data.session.user;
+      console.log('Logado como:', user.email);
+      // Mostrar email do usuário na navbar se houver elemento
+      var elUser = document.getElementById('nav-user-email');
+      if(elUser) elUser.textContent = user.email;
+    } else {
+      // Não logado - mostrar tela de login
+      document.getElementById('tela-login').style.display='flex';
+    }
+  } catch(e) {
+    console.warn('Erro ao verificar sessão:', e);
+    document.getElementById('tela-login').style.display='flex';
+  }
+}
+
+async function fazerLogin(){
+  var email = (document.getElementById('login-email')||{value:''}).value.trim();
+  var senha = (document.getElementById('login-senha')||{value:''}).value;
+  var erro = document.getElementById('login-erro');
+  var btn = document.getElementById('btn-login');
+  
+  if(!email||!senha){
+    erro.textContent='Preencha e-mail e senha.';
+    erro.style.display='block';
+    return;
+  }
+  
+  btn.textContent='Entrando...';
+  btn.disabled=true;
+  erro.style.display='none';
+  
+  try {
+    var result = await supa.auth.signInWithPassword({email:email, password:senha});
+    if(result.error){
+      erro.textContent='E-mail ou senha incorretos.';
+      erro.style.display='block';
+      btn.textContent='Entrar';
+      btn.disabled=false;
+    } else {
+      document.getElementById('tela-login').style.display='none';
+      btn.textContent='Entrar';
+      btn.disabled=false;
+      loadFromSupabase();
+    }
+  } catch(e) {
+    erro.textContent='Erro ao fazer login. Tente novamente.';
+    erro.style.display='block';
+    btn.textContent='Entrar';
+    btn.disabled=false;
+  }
+}
+
+async function fazerLogout(){
+  await supa.auth.signOut();
+  document.getElementById('tela-login').style.display='flex';
+  document.getElementById('login-email').value='';
+  document.getElementById('login-senha').value='';
+}
+
+// Enter no campo senha faz login
+document.addEventListener('DOMContentLoaded', function(){
+  var senhaEl = document.getElementById('login-senha');
+  if(senhaEl) senhaEl.addEventListener('keydown', function(e){if(e.key==='Enter')fazerLogin();});
+  var emailEl = document.getElementById('login-email');
+  if(emailEl) emailEl.addEventListener('keydown', function(e){if(e.key==='Enter')document.getElementById('login-senha').focus();});
+});
+
 try{initSelects();}catch(e){console.warn(e);}
 try{populateDeptoSelect();}catch(e){console.warn(e);}
 try{renderFuncionarios();}catch(e){console.warn(e);}
 try{renderDashboard();}catch(e){console.warn(e);}
-// Carregar dados do Supabase ao iniciar
+// Verificar sessão e carregar dados ao iniciar
 setTimeout(function(){
-  loadFromSupabase();
-  // Iniciar Realtime após carregar
-  setTimeout(function(){iniciarRealtime();}, 2000);
+  verificarSessao().then(function(){
+    var loginEl = document.getElementById('tela-login');
+    if(loginEl && loginEl.style.display === 'none'){
+      loadFromSupabase();
+      setTimeout(function(){iniciarRealtime();}, 2000);
+    }
+  });
 }, 500);
 </script>
 
