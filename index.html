@@ -5529,7 +5529,7 @@ async function fazerLogin(){
 }
 
 async function fazerLogout(){
-  await supa.auth.signOut();
+  await supa.auth.signOut({scope:'global'});
   document.getElementById('tela-login').style.display='flex';
   document.getElementById('login-email').value='';
   document.getElementById('login-senha').value='';
