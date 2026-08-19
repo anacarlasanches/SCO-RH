@@ -148,6 +148,7 @@ tbody tr:last-child td{border-bottom:none;}
   <div class="nav-tab" onclick="goTo('avaliacoes',this)">🌱 Desenvolvimento</div>
   <div style="margin-left:auto;display:flex;gap:6px;align-items:center;padding:0 4px;">
     <button class="btn btn-sm" onclick="exportarDadosComLog()" style="background:#fff;color:var(--sco-azul);border:1px solid #fff;font-size:11px;font-weight:700;">📤 Exportar dados</button>
+    <button class="btn btn-sm" onclick="fazerLogout()" style="background:#dc2626;color:#fff;font-size:11px;">🚪 Sair</button>
     <button class="btn btn-sm" onclick="document.getElementById('import-dados-input').click()" style="background:var(--sco-laranja);color:#fff;font-size:11px;">📥 Importar dados</button>
     <input type="file" id="import-dados-input" accept=".json" style="display:none;" onchange="importarDados(this.files[0])">
   </div>
