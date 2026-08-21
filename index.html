@@ -170,9 +170,127 @@ tbody tr:last-child td{border-bottom:none;}
   .metrics-grid { grid-template-columns: 1fr !important; }
   .nav-tab { font-size: 9px !important; padding: 5px 6px !important; }
 }
+
+/* ===== SIDEBAR LAYOUT ===== */
+body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+#app-layout { display: flex; flex: 1; overflow: hidden; }
+#sidebar {
+  width: 190px;
+  min-width: 190px;
+  background: #11205b;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+  z-index: 100;
+}
+#sidebar-brand {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+#sidebar-brand .brand-name {
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+#sidebar-brand .brand-sub {
+  color: rgba(255,255,255,0.45);
+  font-size: 10px;
+}
+#sidebar-nav { flex: 1; padding: 6px 0; overflow-y: auto; }
+.sidebar-item {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.sidebar-item:hover { background: rgba(255,255,255,0.07); }
+.sidebar-item.active {
+  background: rgba(249,70,3,0.18);
+  border-left: 3px solid #f94603;
+}
+.sidebar-item .s-icon { font-size: 15px; flex-shrink: 0; }
+.sidebar-item .s-label { color: rgba(255,255,255,0.65); font-size: 12px; }
+.sidebar-item.active .s-label { color: white; font-weight: 600; }
+#sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 0;
+  flex-shrink: 0;
+}
+#main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+#main-topbar {
+  background: white;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e2e6f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+#main-content-area {
+  flex: 1;
+  overflow-y: auto;
+  background: #f0f2fa;
+}
+.navbar { display: none !important; }
 </style>
 </head>
 <body>
+
+<!-- Layout principal com sidebar -->
+<div id="app-layout">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="sidebar-brand">
+      <div class="brand-name">SCO</div>
+      <div class="brand-sub">Gente & Gestão</div>
+    </div>
+    <div id="sidebar-nav">
+      <div class="sidebar-item active" onclick="sidebarGoTo('dashboard', this)" data-page="dashboard"><span class="s-icon">📊</span><span class="s-label">Dashboard</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('relatorio', this)" data-page="relatorio"><span class="s-icon">📋</span><span class="s-label">Lançamentos</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('funcionarios', this)" data-page="funcionarios"><span class="s-icon">👥</span><span class="s-label">Funcionários</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('ferias-ctrl', this)" data-page="ferias-ctrl"><span class="s-icon">🏖️</span><span class="s-label">Férias</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('metas', this)" data-page="metas"><span class="s-icon">🎯</span><span class="s-label">Metas</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('rh', this)" data-page="rh"><span class="s-icon">📈</span><span class="s-label">RH</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('alertas', this)" data-page="alertas"><span class="s-icon">🔔</span><span class="s-label">Alertas</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('historico', this)" data-page="historico"><span class="s-icon">📜</span><span class="s-label">Histórico</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('perfil-equipe', this)" data-page="perfil-equipe"><span class="s-icon">👥</span><span class="s-label">Perfil da Equipe</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('relatorios', this)" data-page="relatorios"><span class="s-icon">📊</span><span class="s-label">Relatórios</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('avaliacoes', this)" data-page="avaliacoes"><span class="s-icon">🌱</span><span class="s-label">Desenvolvimento</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('importacoes', this)" data-page="importacoes"><span class="s-icon">📥</span><span class="s-label">Importações</span></div>
+    </div>
+    <div id="sidebar-footer">
+      <div class="sidebar-item" onclick="fazerLogout()"><span class="s-icon">🚪</span><span class="s-label">Sair</span></div>
+    </div>
+  </div>
+
+  <!-- Área principal -->
+  <div id="main-area">
+    <div id="main-topbar">
+      <span style="font-size:13px;font-weight:700;color:#11205b;flex:1;" id="topbar-title">Dashboard</span>
+      
+    <button class="btn btn-sm" onclick="exportarDados()" style="background:rgba(17,32,91,0.08);color:#11205b;font-size:11px;">📤 Exportar</button>
+    <button class="btn btn-sm" onclick="document.getElementById('import-dados-input').click()" style="background:rgba(17,32,91,0.08);color:#11205b;font-size:11px;">📥 Importar</button>
+    <button class="btn btn-sm" onclick="fazerLogout()" style="background:#dc2626;color:#fff;font-size:11px;">🚪 Sair</button>
+
+    </div>
+    <div id="main-content-area">
 <div class="navbar">
   <div class="navbar-logo">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 566.93 566.93">
@@ -3060,6 +3178,7 @@ function removerHistorico(id){
   if(!confirm('Remover este registro?')) return;
   historico = historico.filter(function(h){return h.id!==id;});
   localStorage.setItem('rt_hist_sal', JSON.stringify(historico));
+  try{supa.from('historico_salarial').delete().eq('id',id).then(function(){});}catch(e){}
   renderHistorico();
   toast('Registro removido.');
 }
@@ -4416,7 +4535,9 @@ function excluirAvaliacao(id){
   var f=funcionarios.find(function(x){return x.id===av.funcId;})||{nome:'?'};
   if(!confirm('Excluir avaliacao de '+f.nome+' ('+av.periodo+')?'))return;
   avaliacoes=avaliacoes.filter(function(a){return a.id!==id;});
-  saveAvaliacoes();renderHistoricoAvaliacoes();toast('Avaliacao excluida.');
+  saveAvaliacoes();
+  try{supa.from('avaliacoes').delete().eq('id',id).then(function(){});}catch(e){}
+  renderHistoricoAvaliacoes();toast('Avaliacao excluida.');
 }
 
 // ===== IMPORTAR AVALIACAO XLSX =====
@@ -5600,6 +5721,21 @@ document.addEventListener('DOMContentLoaded', function(){
   if(emailEl) emailEl.addEventListener('keydown', function(e){if(e.key==='Enter')document.getElementById('login-senha').focus();});
 });
 
+
+function sidebarGoTo(page, el){
+  // Navegar
+  goTo(page, el);
+  // Atualizar sidebar item ativo
+  document.querySelectorAll('.sidebar-item').forEach(function(item){
+    item.classList.remove('active');
+  });
+  if(el) el.classList.add('active');
+  // Atualizar título da topbar
+  var label = el ? el.querySelector('.s-label') : null;
+  var title = document.getElementById('topbar-title');
+  if(title && label) title.textContent = label.textContent;
+}
+
 try{initSelects();}catch(e){console.warn(e);}
 try{populateDeptoSelect();}catch(e){console.warn(e);}
 try{renderFuncionarios();}catch(e){console.warn(e);}
@@ -5811,5 +5947,9 @@ setTimeout(function(){
 </div>
 
 
+
+    </div><!-- /main-content-area -->
+  </div><!-- /main-area -->
+</div><!-- /app-layout -->
 </body>
 </html>
