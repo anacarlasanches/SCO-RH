@@ -127,38 +127,48 @@ tbody tr:last-child td{border-bottom:none;}
 
 /* ===== RESPONSIVO MOBILE ===== */
 @media (max-width: 768px) {
-  .navbar { padding: 8px 10px; flex-wrap: wrap; gap: 6px; }
-  .navbar .brand { font-size: 13px; }
-  .nav-links { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
-  .nav-links a { font-size: 10px; padding: 4px 6px; }
-  .nav-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-  .nav-actions button, .nav-actions .btn { font-size: 10px; padding: 4px 8px; }
+  .navbar {
+    height: auto !important;
+    padding: 6px 8px !important;
+    flex-wrap: wrap;
+    gap: 4px;
+    overflow: visible;
+  }
+  .navbar-logo { display: none; }
+  .navbar-divider { display: none; }
+  .nav-tab {
+    height: auto !important;
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+  .nav-tab.active { border-bottom: 2px solid #f94603 !important; }
+  .nav-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 0;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .nav-actions button, .nav-actions .btn {
+    font-size: 10px !important;
+    padding: 4px 8px !important;
+  }
   .main-content { padding: 10px; }
   .page-title { font-size: 18px; }
-  .page-sub { font-size: 12px; }
-  .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
-  .metric-card { padding: 10px; }
-  .metric-value { font-size: 20px !important; }
-  .metric-label { font-size: 11px; }
-  .filter-bar { flex-direction: column; gap: 8px; }
-  .filter-bar input, .filter-bar select { width: 100% !important; min-width: unset !important; box-sizing: border-box; }
-  .filter-bar .btn { width: 100%; text-align: center; }
-  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  table { min-width: 600px; }
-  th, td { font-size: 11px; padding: 6px 8px; }
-  .func-grid { grid-template-columns: 1fr !important; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .filter-bar { flex-direction: column; gap: 6px; }
+  .filter-bar input, .filter-bar select { width: 100% !important; box-sizing: border-box; }
+  table { min-width: 500px; }
+  th, td { font-size: 11px; padding: 5px 6px; }
   .form-grid { grid-template-columns: 1fr !important; }
-  .modal-header { padding: 12px 16px; }
-  .modal-header h2 { font-size: 16px; }
-  canvas { max-width: 100%; }
-  .card { padding: 12px; }
-  .avatar { width: 32px !important; height: 32px !important; font-size: 11px !important; }
   #tela-login > div { padding: 24px 16px !important; }
 }
 @media (max-width: 480px) {
   .metrics-grid { grid-template-columns: 1fr !important; }
-  .nav-links a { font-size: 9px; padding: 3px 5px; }
-  .page-title { font-size: 16px; }
+  .nav-tab { font-size: 9px !important; padding: 5px 6px !important; }
 }
 </style>
 </head>
