@@ -574,7 +574,7 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
           <option value="">Todos</option>
         </select>
         <button class="btn btn-sm btn-outline" onclick="limparFiltrosFuncs()" title="Limpar filtros">✕ Limpar</button>
-        <button class="btn btn-sm" onclick="exportarFuncionariosExcel()" style="background:#1d6f42;color:#fff;border:none;font-weight:600;">📊 Excel</button>
+        <select id="func-excel-filtro" style="padding:5px 8px;border:1px solid #d5daea;border-radius:8px;font-size:12px;"><option value="ativos">✅ Ativos</option><option value="desligados">🔴 Desligados</option><option value="todos">👥 Todos</option></select> <button class="btn btn-sm" onclick="exportarFuncionariosExcel()" style="background:#1d6f42;color:#fff;border:none;font-weight:600;">📊 Excel</button>
         <button class="btn btn-sm" onclick="exportarFuncionariosPDF()" style="background:#dc2626;color:#fff;border:none;font-weight:600;">📄 PDF</button>
       </div>
     </div>
@@ -4918,21 +4918,27 @@ function fecharModalLancamento(){
 
 function exportarFuncionariosExcel(){
   if(typeof XLSX==='undefined'){toast('Aguarde...',false);return;}
-  var list=funcionarios.filter(function(f){return f.ativo!==false;}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
-  var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status']];
-  list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?'Inativo':'Ativo']);});
+  var filtro=(document.getElementById('func-excel-filtro')||{value:'ativos'}).value;
+  var list=funcionarios.filter(function(f){
+    if(filtro==='desligados') return f.ativo===false;
+    if(filtro==='todos') return true;
+    return f.ativo!==false;
+  }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  var nomeFiltro=filtro==='desligados'?'Desligados':filtro==='todos'?'Todos':'Ativos';
+  var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status','Data Desligamento']];
+  list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?'Inativo':'Ativo',f.dataDesligamento||'']);});
   var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb,ws,'Funcionarios');XLSX.writeFile(wb,'SCO_Funcionarios.xlsx');
-  toast('Excel exportado com '+list.length+' funcionarios!');
+  XLSX.utils.book_append_sheet(wb,ws,'Funcionarios');XLSX.writeFile(wb,'SCO_Funcionarios_'+nomeFiltro+'.xlsx');
+  toast('Excel exportado com '+list.length+' funcionario(s) — '+nomeFiltro+'!');
 }
 
 function exportarFuncionariosPDF(){
-  var list=funcionarios.filter(function(f){return f.ativo!==false;}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  var filtro=(document.getElementById('func-excel-filtro')||{value:'ativos'}).value;var nomeFiltro=filtro==='desligados'?'Desligados':filtro==='todos'?'Todos':'Ativos';var list=funcionarios.filter(function(f){if(filtro==='desligados')return f.ativo===false;if(filtro==='todos')return true;return f.ativo!==false;}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   var win=window.open('','_blank');
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Funcionarios</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;}table{width:100%;border-collapse:collapse;}th{background:#11205b;color:#fff;padding:6px;}td{padding:5px;border-bottom:1px solid #eee;}@media print{button{display:none;}}</style></head><body>';
   html+='<h2>Funcionarios - SCO</h2><button onclick="window.print()">Imprimir</button>';
-  html+='<table><tr><th>#</th><th>Nome</th><th>Cargo</th><th>Depto</th><th>Tipo</th><th>Admissao</th><th>Status</th></tr>';
-  html+=list.map(function(f,i){return '<tr><td>'+(i+1)+'</td><td>'+f.nome+'</td><td>'+f.cargo+'</td><td>'+(f.depto||'-')+'</td><td>'+(f.tipo||'CLT')+'</td><td>'+(f.admissao||'-')+'</td><td>'+(f.ativo===false?'Inativo':'Ativo')+'</td></tr>';}).join('');
+  html+='<table><tr><th>#</th><th>Nome</th><th>Cargo</th><th>Depto</th><th>Tipo</th><th>Admissao</th><th>Status</th><th>Dt. Desligamento</th></tr>';
+  html+=list.map(function(f,i){return '<tr><td>'+(i+1)+'</td><td>'+f.nome+'</td><td>'+f.cargo+'</td><td>'+(f.depto||'-')+'</td><td>'+(f.tipo||'CLT')+'</td><td>'+(f.admissao||'-')+'</td><td>'+(f.ativo===false?'Inativo':'Ativo')+'</td><td>'+((f.demissao&&f.demissao.data)||'')+'</td></tr>';}).join('');
   html+='</table></body></html>';
   win.document.write(html);win.document.close();
 }
