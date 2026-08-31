@@ -932,6 +932,67 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
   </div>
 </div>
 
+<!-- Modal Relatório Férias -->
+<div id="modal-relatorio-ferias" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharModalRelatorioFerias()">
+  <div style="background:#fff;border-radius:16px;max-width:420px;width:95%;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;color:#11205b;font-size:16px;">📊 Relatório de Férias</h3>
+      <button onclick="fecharModalRelatorioFerias()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Mês</label>
+        <select id="rel-fer-mes" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;">
+          <option value="">Todos os meses</option>
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Ano</label>
+        <select id="rel-fer-ano" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;">
+          <option value="2024">2024</option>
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button class="btn btn-orange" onclick="gerarRelatorioFeriasExcel()" style="flex:1;">📥 Exportar Excel</button>
+      <button class="btn btn-primary" onclick="gerarRelatorioFeriasPDF()" style="flex:1;background:#11205b;">🖨️ Exportar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Gozo de Férias -->
+<div class="detail-overlay" id="modal-edit-gozo" onclick="if(event.target===this)fecharEditGozo()">
+  <div class="detail-modal" style="width:460px;max-width:98vw;">
+    <div class="modal-header">
+      <h2>✏️ Editar Gozo de Férias</h2>
+      <button class="modal-close" onclick="fecharEditGozo()">✕</button>
+    </div>
+    <div style="padding:0 20px 20px;">
+      <div class="form-grid">
+        <div class="form-group"><label>Dias de Gozo</label><input type="number" id="eg-dias" min="1" max="30"/></div>
+        <div class="form-group"><label>Data Início</label><input type="date" id="eg-inicio"/></div>
+        <div class="form-group"><label>Data Fim</label><input type="date" id="eg-fim"/></div>
+        <div class="form-group"><label>Valor Pago (R$)</label><input type="number" id="eg-valor" step="0.01" placeholder="0.00"/></div>
+        <div class="form-group"><label>Data Pagamento</label><input type="date" id="eg-pgto"/></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Observação</label><input id="eg-obs" placeholder="Opcional..."/></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-orange" onclick="salvarEditGozo()">💾 Salvar</button>
+        <button class="btn btn-outline" onclick="fecharEditGozo()">✕ Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="page-ferias-ctrl" class="page">
   <div class="page-title">🏖️ Controle de Férias</div>
   <div class="page-sub">Gerencie períodos aquisitivos, gozo e saldo de cada colaborador</div>
@@ -967,6 +1028,7 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
     </select>
     <button class="btn btn-orange" onclick="abrirModalProgramarFerias()">🏖️ Programar Férias</button>
     <button class="btn btn-primary" onclick="abrirModalNovoPeriodo()" style="background:#3b82f6;">📅 Novo Período</button>
+    <button class="btn btn-sm" onclick="abrirModalRelatorioFerias()" style="background:#16a34a;color:#fff;">📊 Relatório Excel/PDF</button>
   </div>
   <div id="ferias-ctrl-lista"></div>
 </div>
@@ -5734,6 +5796,109 @@ function sidebarGoTo(page, el){
   var label = el ? el.querySelector('.s-label') : null;
   var title = document.getElementById('topbar-title');
   if(title && label) title.textContent = label.textContent;
+}
+
+
+function abrirModalRelatorioFerias(){
+  document.getElementById('modal-relatorio-ferias').style.display='flex';
+  var mesAtual = new Date().getMonth()+1;
+  document.getElementById('rel-fer-mes').value = mesAtual;
+}
+function fecharModalRelatorioFerias(){
+  document.getElementById('modal-relatorio-ferias').style.display='none';
+}
+
+function getDadosRelatorioFerias(){
+  var mes = parseInt(document.getElementById('rel-fer-mes').value)||0;
+  var ano = parseInt(document.getElementById('rel-fer-ano').value)||0;
+  var linhas = [];
+  funcionarios.filter(function(f){return f.ativo!==false;})
+    .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');})
+    .forEach(function(f){
+      var periodos = f.periodos||[];
+      periodos.forEach(function(p){
+        var gozos = p.gozos||[];
+        gozos.forEach(function(g){
+          if(!g.inicio) return;
+          var partes = g.inicio.split('-');
+          var gAno = parseInt(partes[0]);
+          var gMes = parseInt(partes[1]);
+          if(mes && gMes!==mes) return;
+          if(ano && gAno!==ano) return;
+          var saldo = (p.diasDireito||30) - (p.diasGozados||0);
+          linhas.push({
+            nome: f.nome,
+            cargo: f.cargo||'',
+            departamento: f.departamento||'',
+            periodoAquisitivo: (p.inicio||'') + ' a ' + (p.fim||''),
+            dataInicio: g.inicio||'',
+            dataFim: g.fim||'',
+            diasGozo: g.diasGozo||0,
+            saldoRestante: saldo > 0 ? saldo : 0,
+            status: g.pago ? 'Pago' : 'Programado'
+          });
+        });
+      });
+    });
+  return linhas;
+}
+
+function fmtDataBR(d){
+  if(!d) return '';
+  var p = d.split('-');
+  if(p.length!==3) return d;
+  return p[2]+'/'+p[1]+'/'+p[0];
+}
+
+function gerarRelatorioFeriasExcel(){
+  var dados = getDadosRelatorioFerias();
+  if(!dados.length){toast('Nenhuma férias encontrada para o filtro selecionado.');return;}
+  var mes = document.getElementById('rel-fer-mes').value;
+  var ano = document.getElementById('rel-fer-ano').value;
+  var csvRows = [
+    ['Nome','Cargo','Departamento','Período Aquisitivo','Data Início','Data Fim','Dias de Gozo','Saldo Restante','Status']
+  ];
+  dados.forEach(function(l){
+    csvRows.push([
+      l.nome, l.cargo, l.departamento, l.periodoAquisitivo,
+      fmtDataBR(l.dataInicio), fmtDataBR(l.dataFim),
+      l.diasGozo, l.saldoRestante, l.status
+    ]);
+  });
+  var csvContent = csvRows.map(function(r){
+    return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(';');
+  }).join('\n');
+  var BOM = '\uFEFF';
+  var blob = new Blob([BOM+csvContent],{type:'text/csv;charset=utf-8;'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Ferias_Programadas'+(mes?'_M'+mes:'')+(ano?'_'+ano:'')+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  fecharModalRelatorioFerias();
+  toast('✅ Excel exportado!');
+}
+
+function gerarRelatorioFeriasPDF(){
+  var dados = getDadosRelatorioFerias();
+  if(!dados.length){toast('Nenhuma férias encontrada para o filtro selecionado.');return;}
+  var mes = document.getElementById('rel-fer-mes').value;
+  var ano = document.getElementById('rel-fer-ano').value;
+  var mesesNomes = {1:'Janeiro',2:'Fevereiro',3:'Março',4:'Abril',5:'Maio',6:'Junho',7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',11:'Novembro',12:'Dezembro'};
+  var titulo = 'Relatório de Férias Programadas' + (mes?' — '+mesesNomes[parseInt(mes)]+'/'+ano:'');
+  var linhas = dados.map(function(l){
+    return '<tr><td>'+l.nome+'</td><td>'+l.cargo+'</td><td>'+l.departamento+'</td><td>'+l.periodoAquisitivo+'</td><td>'+fmtDataBR(l.dataInicio)+'</td><td>'+fmtDataBR(l.dataFim)+'</td><td style="text-align:center;">'+l.diasGozo+'</td><td style="text-align:center;">'+l.saldoRestante+'</td><td>'+l.status+'</td></tr>';
+  }).join('');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}h2{color:#11205b;font-size:14px;}table{width:100%;border-collapse:collapse;}th{background:#11205b;color:#fff;padding:6px 8px;text-align:left;font-size:10px;}td{padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;}tr:nth-child(even){background:#f8f9ff;}.badge-pago{background:#dcfce7;color:#16a34a;padding:2px 6px;border-radius:4px;}.badge-prog{background:#fff3cd;color:#856404;padding:2px 6px;border-radius:4px;}@media print{button{display:none;}}</style></head><body>';
+  html += '<h2>'+titulo+'</h2>';
+  html += '<p style="color:#666;font-size:10px;">Gerado em '+new Date().toLocaleDateString("pt-BR")+' — '+dados.length+' registro(s)</p>';
+  html += '<table><thead><tr><th>Nome</th><th>Cargo</th><th>Departamento</th><th>Período Aquisitivo</th><th>Início Férias</th><th>Fim Férias</th><th>Dias</th><th>Saldo</th><th>Status</th></tr></thead><tbody>'+linhas+'</tbody></table>';
+  html += '<br><button onclick="window.print()" style="background:#11205b;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>';
+  html += '</body></html>';
+  var win = window.open('','_blank');
+  if(win){win.document.write(html);win.document.close();}
+  fecharModalRelatorioFerias();
 }
 
 try{initSelects();}catch(e){console.warn(e);}
