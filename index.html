@@ -276,7 +276,8 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
       <div class="sidebar-item" onclick="sidebarGoTo('importacoes', this)" data-page="importacoes"><span class="s-icon">📥</span><span class="s-label">Importações</span></div>
     </div>
     <div id="sidebar-footer">
-      <div class="sidebar-item" onclick="fazerLogout()"><span class="s-icon">🚪</span><span class="s-label">Sair</span></div>
+      <div class="sidebar-item" onclick="abrirConfigChecklist()"><span class="s-icon">⚙️</span><span class="s-label">Config. Checklist</span></div>
+    <div class="sidebar-item" onclick="fazerLogout()"><span class="s-icon">🚪</span><span class="s-label">Sair</span></div>
     </div>
   </div>
 
@@ -392,6 +393,53 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
         <button class="btn btn-orange" onclick="salvarPagamentoFerias()">💰 Confirmar Pagamento</button>
         <button class="btn btn-outline" onclick="fecharModalPagarFerias()">✕ Cancelar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Checklist -->
+<div id="modal-checklist" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;max-width:520px;width:95%;max-height:85vh;display:flex;flex-direction:column;">
+    <div style="padding:16px 20px;border-bottom:1px solid #e2e6f0;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div id="checklist-titulo" style="font-size:16px;font-weight:700;color:#11205b;"></div>
+        <div id="checklist-subtitulo" style="font-size:12px;color:#888;margin-top:2px;"></div>
+      </div>
+      <button onclick="fecharChecklist()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div style="padding:12px 20px;background:#f8f9ff;border-bottom:1px solid #e2e6f0;">
+      <div id="checklist-progresso-texto" style="font-size:12px;color:#555;margin-bottom:6px;"></div>
+      <div style="background:#e2e6f0;border-radius:99px;height:8px;overflow:hidden;">
+        <div id="checklist-progresso-bar" style="height:100%;border-radius:99px;transition:width 0.3s;width:0%;"></div>
+      </div>
+    </div>
+    <div id="checklist-lista" style="flex:1;overflow-y:auto;padding:8px 12px;"></div>
+    <div style="padding:12px 20px;border-top:1px solid #e2e6f0;display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="fecharChecklist()" style="flex:1;">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Config Checklist -->
+<div id="modal-config-checklist" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;max-width:520px;width:95%;max-height:85vh;display:flex;flex-direction:column;">
+    <div style="padding:16px 20px;border-bottom:1px solid #e2e6f0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:16px;font-weight:700;color:#11205b;">⚙️ Configurar Checklists</div>
+      <button onclick="fecharConfigChecklist()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid #e2e6f0;display:flex;gap:6px;">
+      <button class="cfg-ck-tab btn btn-sm" data-tipo="admissao_CLT" onclick="renderConfigChecklist('admissao_CLT')" style="background:#11205b;color:#fff;">Admissão CLT</button>
+      <button class="cfg-ck-tab btn btn-sm" data-tipo="admissao_PJ" onclick="renderConfigChecklist('admissao_PJ')" style="background:transparent;color:#11205b;border:1px solid #11205b;">Admissão PJ</button>
+      <button class="cfg-ck-tab btn btn-sm" data-tipo="desligamento" onclick="renderConfigChecklist('desligamento')" style="background:transparent;color:#11205b;border:1px solid #11205b;">Desligamento</button>
+    </div>
+    <div id="cfg-checklist-lista" style="flex:1;overflow-y:auto;padding:12px 16px;"></div>
+    <div style="padding:10px 16px;border-top:1px solid #e2e6f0;display:flex;gap:6px;">
+      <input id="cfg-novo-item" placeholder="Nova tarefa..." style="flex:1;padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter')adicionarItemChecklist()"/>
+      <button class="btn btn-sm btn-primary" onclick="adicionarItemChecklist()" style="background:#11205b;color:#fff;">+ Adicionar</button>
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid #e2e6f0;display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="fecharConfigChecklist()" style="flex:1;">Cancelar</button>
+      <button class="btn btn-orange" onclick="salvarConfigChecklist()" style="flex:1;">💾 Salvar</button>
     </div>
   </div>
 </div>
@@ -1402,6 +1450,9 @@ function addFuncionario(){
   ['f-nome','f-cargo'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-admissao').value='';
   toast('Funcionário cadastrado!');
+  // Abrir checklist de admissão
+  var novoFunc = funcionarios[funcionarios.length-1];
+  if(novoFunc) setTimeout(function(){abrirChecklistAdmissao(novoFunc.id);},400);
 }
 function verFuncionario(id){
   const f = funcionarios.find(f=>f.id===id);
@@ -1583,10 +1634,12 @@ function confirmarDesativar(){
     valor: parseFloat(document.getElementById('dem-valor').value)||0,
     fgtsRescisorio: parseFloat(document.getElementById('dem-fgts').value)||0,
   };
+  var _funcDesligadaId = desativarFuncId;
   save();
   renderFuncionarios();
   fecharDesativar();
   toast('Funcionário desativado.');
+  if(_funcDesligadaId) setTimeout(function(){abrirChecklistDesligamento(_funcDesligadaId);},400);
 }
 
 function fecharDesativar(){
@@ -1666,7 +1719,7 @@ function renderFuncionarios(){
     return '<tr>'
       +'<td style="'+(inativo?'opacity:0.55':'')+'"><div class="func-info">'
       +'<div class="avatar" style="background:'+avatarColor(i)+'">'+initials(f.nome)+'</div>'
-      +'<div><div style="font-weight:600">'+f.nome+badgeInativo+'</div>'
+      +'<div><div style="font-weight:600">'+f.nome+badgeInativo+(funcTemChecklistPendente(f.id)?' <span title="Checklist pendente" onclick="abrirChecklistPendente(\"'+f.id+'\")">⚠️</span>':'')+'</div>'
       +'<div style="font-size:11px;color:#888">'+(f.tipo||'CLT')+'</div></div></div></td>'
       +'<td>'+f.cargo+'<br><span style="font-size:11px;color:#aaa">'+(f.nivel||'')+'</span></td>'
       +'<td><span class="badge badge-blue">'+(f.depto||'—')+'</span></td>'
@@ -5905,6 +5958,205 @@ function gerarRelatorioFeriasPDF(){
   var win = window.open('','_blank');
   if(win){win.document.write(html);win.document.close();}
   fecharModalRelatorioFerias();
+}
+
+
+var _checklistTemplates = {
+  admissao_CLT: [
+    'Exame admissional','Documentos admissionais','E-mail corporativo',
+    'Acesso Plataforma','Acesso Sults','Solicitação VT e VT 1ª semana',
+    'Inclusão Evartel','Inclusão Welhub','Inclusão Ifood','Inclusão Araujo',
+    'Inclusão Starbem','Inclusão Avus','Inclusão Punkify','Inclusão Pagday',
+    'Sistema SCO','Sistema VT/VR','Escala','Termo de equipamentos',
+    'Note + carregador + mouse + fone + mousepad','Uniforme'
+  ],
+  admissao_PJ: [
+    'Contrato PJ','Inclusão Welhub','Inclusão Ifood','Inclusão Araujo',
+    'Inclusão Starbem','Inclusão Avus','Inclusão Punkify','Inclusão Pagday',
+    'Termo de equipamentos','Note + carregador + mouse + fone + mousepad','Uniforme'
+  ],
+  desligamento: [
+    'Bloqueio e-mail','Bloqueio Sults','Bloqueio Plataforma',
+    'Devolução de equipamentos','Exame demissional','Termo devolução de equipamentos',
+    'Fechamento rescisão','Exclusão Evartel','Exclusão Welhub','Exclusão Ifood',
+    'Exclusão Araujo','Exclusão Starbem','Exclusão Avus','Exclusão Punkify','Exclusão Pagday'
+  ]
+};
+
+function getChecklistTemplates(){
+  var saved = localStorage.getItem('rt_checklist_templates');
+  if(saved){ try{ return JSON.parse(saved); }catch(e){} }
+  return JSON.parse(JSON.stringify(_checklistTemplates));
+}
+function saveChecklistTemplates(t){
+  localStorage.setItem('rt_checklist_templates', JSON.stringify(t));
+}
+
+// Persistência do progresso por funcionário
+function getChecklistProgresso(){
+  try{ return JSON.parse(localStorage.getItem('rt_checklist_progresso')||'{}'); }catch(e){return {};}
+}
+function saveChecklistProgresso(obj){
+  localStorage.setItem('rt_checklist_progresso', JSON.stringify(obj));
+  try{ supa.from('configuracoes').upsert([{chave:'checklist_progresso',valor:obj}]).then(function(){}); }catch(e){}
+}
+function getChecklistFunc(funcId, tipo){
+  var prog = getChecklistProgresso();
+  var key = funcId+'_'+tipo;
+  return prog[key]||null;
+}
+function saveChecklistFunc(funcId, tipo, items){
+  var prog = getChecklistProgresso();
+  var key = funcId+'_'+tipo;
+  var total = items.length;
+  var feitos = items.filter(function(i){return i.done;}).length;
+  if(feitos===total && total>0){
+    delete prog[key]; // concluído — remove o alerta
+  } else {
+    prog[key] = {tipo:tipo, items:items, atualizado:new Date().toISOString()};
+  }
+  saveChecklistProgresso(prog);
+}
+
+function funcTemChecklistPendente(funcId){
+  var prog = getChecklistProgresso();
+  var tipos = ['admissao_CLT','admissao_PJ','desligamento'];
+  return tipos.some(function(t){ return prog[funcId+'_'+t]; });
+}
+
+var _checklistAtual = null;
+
+function abrirChecklistAdmissao(funcId){
+  var f = funcionarios.find(function(x){return x.id===funcId;});
+  if(!f) return;
+  // Se func desligada, não abrir admissão
+  if(f.ativo===false) return;
+  var tipo = (f.tipo==='PJ'||f.tipo==='Autônomo') ? 'admissao_PJ' : 'admissao_CLT';
+  var salvo = getChecklistFunc(funcId, tipo);
+  var templates = getChecklistTemplates();
+  var items = salvo ? salvo.items : (templates[tipo]||[]).map(function(label){return {label:label,done:false};});
+  _checklistAtual = {funcId:funcId, tipo:tipo, items:items};
+  renderChecklist('Checklist de Admissão — '+f.nome, f.tipo||'CLT');
+  document.getElementById('modal-checklist').style.display='flex';
+}
+
+function abrirChecklistDesligamento(funcId){
+  var f = funcionarios.find(function(x){return x.id===funcId;});
+  if(!f) return;
+  var tipo = 'desligamento';
+  var salvo = getChecklistFunc(funcId, tipo);
+  var templates = getChecklistTemplates();
+  var items = salvo ? salvo.items : (templates[tipo]||[]).map(function(label){return {label:label,done:false};});
+  _checklistAtual = {funcId:funcId, tipo:tipo, items:items};
+  renderChecklist('Checklist de Desligamento — '+f.nome, 'Desligamento');
+  document.getElementById('modal-checklist').style.display='flex';
+}
+
+// Botão para abrir checklist pendente de um funcionário
+function abrirChecklistPendente(funcId){
+  var prog = getChecklistProgresso();
+  var tipos = ['desligamento','admissao_CLT','admissao_PJ'];
+  for(var i=0;i<tipos.length;i++){
+    if(prog[funcId+'_'+tipos[i]]){
+      if(tipos[i]==='desligamento') abrirChecklistDesligamento(funcId);
+      else abrirChecklistAdmissao(funcId);
+      return;
+    }
+  }
+}
+
+function renderChecklist(titulo, subtitulo){
+  document.getElementById('checklist-titulo').textContent = titulo;
+  document.getElementById('checklist-subtitulo').textContent = subtitulo;
+  var lista = document.getElementById('checklist-lista');
+  lista.innerHTML = '';
+  if(!_checklistAtual) return;
+  _checklistAtual.items.forEach(function(item, i){
+    var div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;'+(item.done?'background:#f0fdf4;':'');
+    div.innerHTML = '<input type="checkbox" id="ck-'+i+'" '+(item.done?'checked':'')+' style="width:16px;height:16px;cursor:pointer;accent-color:#16a34a;"/>'
+      +'<label for="ck-'+i+'" style="cursor:pointer;font-size:13px;'+(item.done?'text-decoration:line-through;color:#86efac;':'color:#1e293b;')+'">'+item.label+'</label>';
+    div.querySelector('input').addEventListener('change', function(e){
+      _checklistAtual.items[i].done = e.target.checked;
+      saveChecklistFunc(_checklistAtual.funcId, _checklistAtual.tipo, _checklistAtual.items);
+      renderChecklist(document.getElementById('checklist-titulo').textContent, document.getElementById('checklist-subtitulo').textContent);
+      atualizarProgressoChecklist();
+    });
+    lista.appendChild(div);
+  });
+  atualizarProgressoChecklist();
+}
+
+function atualizarProgressoChecklist(){
+  if(!_checklistAtual) return;
+  var total = _checklistAtual.items.length;
+  var feitos = _checklistAtual.items.filter(function(i){return i.done;}).length;
+  var pct = total ? Math.round(feitos/total*100) : 0;
+  document.getElementById('checklist-progresso-texto').textContent = feitos+' de '+total+' tarefas concluídas ('+pct+'%)';
+  document.getElementById('checklist-progresso-bar').style.width = pct+'%';
+  document.getElementById('checklist-progresso-bar').style.background = pct===100?'#16a34a':'#f94603';
+}
+
+function fecharChecklist(){
+  document.getElementById('modal-checklist').style.display='none';
+  // Atualizar lista de funcionários para refletir ícone de alerta
+  try{renderFuncionarios();}catch(e){}
+  _checklistAtual = null;
+}
+
+var _editandoChecklist = null;
+
+function abrirConfigChecklist(){
+  _editandoChecklist = getChecklistTemplates();
+  renderConfigChecklist('admissao_CLT');
+  document.getElementById('modal-config-checklist').style.display='flex';
+}
+function fecharConfigChecklist(){
+  document.getElementById('modal-config-checklist').style.display='none';
+  _editandoChecklist = null;
+}
+function renderConfigChecklist(tipo){
+  _editandoChecklist._tipoAtivo = tipo;
+  document.querySelectorAll('.cfg-ck-tab').forEach(function(t){
+    t.style.background = t.dataset.tipo===tipo?'#11205b':'transparent';
+    t.style.color = t.dataset.tipo===tipo?'#fff':'#11205b';
+  });
+  var lista = document.getElementById('cfg-checklist-lista');
+  lista.innerHTML = '';
+  var itens = _editandoChecklist[tipo]||[];
+  itens.forEach(function(label, i){
+    var div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:6px;';
+    div.innerHTML = '<input value="'+label.replace(/"/g,'&quot;')+'" style="flex:1;padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;" onchange="_editandoChecklist[_editandoChecklist._tipoAtivo]['+i+']=this.value"/>'
+      +'<button onclick="removerItemChecklist('+i+')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;">🗑️</button>';
+    lista.appendChild(div);
+  });
+}
+function removerItemChecklist(i){
+  var tipo = _editandoChecklist._tipoAtivo;
+  _editandoChecklist[tipo].splice(i,1);
+  renderConfigChecklist(tipo);
+}
+function adicionarItemChecklist(){
+  var tipo = _editandoChecklist._tipoAtivo;
+  var novoItem = document.getElementById('cfg-novo-item').value.trim();
+  if(!novoItem){toast('Digite o nome da tarefa.');return;}
+  _editandoChecklist[tipo].push(novoItem);
+  document.getElementById('cfg-novo-item').value='';
+  renderConfigChecklist(tipo);
+}
+function salvarConfigChecklist(){
+  var tipo = _editandoChecklist._tipoAtivo;
+  var inputs = document.querySelectorAll('#cfg-checklist-lista input');
+  inputs.forEach(function(inp, i){ _editandoChecklist[tipo][i] = inp.value; });
+  var toSave = {
+    admissao_CLT: _editandoChecklist.admissao_CLT,
+    admissao_PJ: _editandoChecklist.admissao_PJ,
+    desligamento: _editandoChecklist.desligamento
+  };
+  saveChecklistTemplates(toSave);
+  fecharConfigChecklist();
+  toast('✅ Checklist salvo!');
 }
 
 try{initSelects();}catch(e){console.warn(e);}
