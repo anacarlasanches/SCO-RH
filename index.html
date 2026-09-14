@@ -1658,7 +1658,7 @@ function reativarFuncionario(id){
   toast('Funcionário reativado!');
 }
 
-function removeFuncionario(id){if(!confirm('Remover?'))return;funcionarios=funcionarios.filter(f=>f.id!==id);save();renderFuncionarios();toast('Removido.');}
+function removeFuncionario(id){if(!confirm('Remover?'))return;funcionarios=funcionarios.filter(f=>f.id!==id);save();try{supa.from('funcionarios').delete().eq('id',id).then(function(){});}catch(e){}renderFuncionarios();toast('Removido.');}
 function popularFiltrosFuncs(){
   // Popular select de cargos
   const cargoEl=document.getElementById('func-filtro-cargo');
