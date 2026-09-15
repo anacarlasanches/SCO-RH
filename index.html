@@ -444,6 +444,37 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
   </div>
 </div>
 
+<!-- Modal Editar Rescisão -->
+<div id="modal-rescisao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharRescisao()">
+  <div class="detail-modal" style="width:560px;max-width:95vw;">
+    <div class="modal-header">
+      <h2>💰 Lançar / Editar Rescisão</h2>
+      <button class="btn btn-sm" onclick="fecharRescisao()" style="color:#888;">✕</button>
+    </div>
+    <div id="rescisao-nome" style="font-size:15px;font-weight:700;color:var(--sco-azul);margin-bottom:16px;"></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Data de demissão *</label><input type="date" id="res-data"/></div>
+      <div class="form-group"><label>Tipo de rescisão *</label>
+        <select id="res-tipo">
+          <option value="">Selecione...</option>
+          <option value="Aviso indenizado pela empresa">Aviso indenizado pela empresa</option>
+          <option value="Aviso trabalhado pela empresa">Aviso trabalhado pela empresa</option>
+          <option value="Pedido de demissão trabalhado">Pedido de demissão trabalhado</option>
+          <option value="Pedido de demissão indenizado">Pedido de demissão indenizado</option>
+          <option value="Demissão por justa causa">Demissão por justa causa</option>
+          <option value="Distrato">Distrato</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Valor da rescisão (R$)</label><input type="number" id="res-valor" step="0.01" placeholder="0.00"/></div>
+      <div class="form-group"><label>FGTS rescisório (R$)</label><input type="number" id="res-fgts" step="0.01" placeholder="0.00"/></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-orange" onclick="salvarRescisao()">💾 Salvar Rescisão</button>
+      <button class="btn btn-outline" onclick="fecharRescisao()">✕ Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="page-dashboard" class="page active">
   <div class="page-title">Dashboard</div>
   <div class="page-sub">Visão geral da remuneração total dos colaboradores</div>
@@ -1534,6 +1565,15 @@ function verFuncionario(id){
       +(f.demissao.fgtsRescisorio?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">FGTS rescisório</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.fgtsRescisorio)+'</div></div>':'')
       +'</div></div>';
   }
+  // Botões para funcionários desligados
+  if(f.ativo===false){
+    html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">';
+    if(funcTemChecklistPendente(f.id)){
+      html += '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="closeModal();setTimeout(function(){abrirChecklistPendente(\''+f.id+'\');},200);">⚠️ Ver Checklist Pendente</button>';
+    }
+    html += '<button class="btn btn-sm btn-orange" onclick="closeModal();setTimeout(function(){abrirRescisao(\''+f.id+'\');},200);">💰 Lançar/Editar Rescisão</button>';
+    html += '</div>';
+  }
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -1719,7 +1759,7 @@ function renderFuncionarios(){
     return '<tr>'
       +'<td style="'+(inativo?'opacity:0.55':'')+'"><div class="func-info">'
       +'<div class="avatar" style="background:'+avatarColor(i)+'">'+initials(f.nome)+'</div>'
-      +'<div><div style="font-weight:600">'+f.nome+badgeInativo+(funcTemChecklistPendente(f.id)?' <span title="Checklist pendente" onclick="abrirChecklistPendente(\"'+f.id+'\")">⚠️</span>':'')+'</div>'
+      +'<div><div style="font-weight:600">'+f.nome+badgeInativo+(funcTemChecklistPendente(f.id)?' <span title="Checklist pendente" style="cursor:pointer;" onclick="event.stopPropagation();abrirChecklistPendente(\"'+f.id+'\")">⚠️</span>':'')+'</div>'
       +'<div style="font-size:11px;color:#888">'+(f.tipo||'CLT')+'</div></div></div></td>'
       +'<td>'+f.cargo+'<br><span style="font-size:11px;color:#aaa">'+(f.nivel||'')+'</span></td>'
       +'<td><span class="badge badge-blue">'+(f.depto||'—')+'</span></td>'
@@ -6157,6 +6197,41 @@ function salvarConfigChecklist(){
   saveChecklistTemplates(toSave);
   fecharConfigChecklist();
   toast('✅ Checklist salvo!');
+}
+
+
+var _rescisaoFuncId = null;
+function abrirRescisao(funcId){
+  var f = funcionarios.find(function(x){return x.id===funcId;});
+  if(!f) return;
+  _rescisaoFuncId = funcId;
+  document.getElementById('rescisao-nome').textContent = f.nome + ' — ' + (f.cargo||'');
+  document.getElementById('res-data').value = (f.demissao&&f.demissao.data)||'';
+  document.getElementById('res-tipo').value = (f.demissao&&f.demissao.tipo)||'';
+  document.getElementById('res-valor').value = (f.demissao&&f.demissao.valor)||'';
+  document.getElementById('res-fgts').value = (f.demissao&&f.demissao.fgtsRescisorio)||'';
+  document.getElementById('modal-rescisao').style.display='flex';
+}
+function fecharRescisao(){
+  document.getElementById('modal-rescisao').style.display='none';
+  _rescisaoFuncId = null;
+}
+function salvarRescisao(){
+  if(!_rescisaoFuncId) return;
+  var data = document.getElementById('res-data').value;
+  var tipo = document.getElementById('res-tipo').value;
+  if(!data||!tipo){toast('Preencha data e tipo de rescisão.');return;}
+  var idx = funcionarios.findIndex(function(x){return x.id===_rescisaoFuncId;});
+  if(idx<0) return;
+  funcionarios[idx].demissao = {
+    data: data,
+    tipo: tipo,
+    valor: parseFloat(document.getElementById('res-valor').value)||0,
+    fgtsRescisorio: parseFloat(document.getElementById('res-fgts').value)||0
+  };
+  save();
+  fecharRescisao();
+  toast('✅ Rescisão salva!');
 }
 
 try{initSelects();}catch(e){console.warn(e);}
