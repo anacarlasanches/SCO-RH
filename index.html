@@ -6036,6 +6036,15 @@ function saveChecklistTemplates(t){
 function getChecklistProgresso(){
   try{ return JSON.parse(localStorage.getItem('rt_checklist_progresso')||'{}'); }catch(e){return {};}
 }
+async function carregarChecklistDoSupabase(){
+  try{
+    var res = await supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').single();
+    if(res.data && res.data.valor){
+      localStorage.setItem('rt_checklist_progresso', JSON.stringify(res.data.valor));
+      console.log('✅ Checklist progresso carregado do Supabase');
+    }
+  }catch(e){ console.warn('Checklist progresso não encontrado no Supabase'); }
+}
 function saveChecklistProgresso(obj){
   localStorage.setItem('rt_checklist_progresso', JSON.stringify(obj));
   try{ supa.from('configuracoes').upsert([{chave:'checklist_progresso',valor:obj}]).then(function(){}); }catch(e){}
@@ -6245,6 +6254,7 @@ setTimeout(function(){
     if(loginEl && loginEl.style.display === 'none'){
       loadFromSupabase();
       setTimeout(function(){iniciarRealtime();}, 2000);
+      setTimeout(function(){carregarChecklistDoSupabase();}, 1000);
     }
   });
 }, 500);
