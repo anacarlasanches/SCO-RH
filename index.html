@@ -276,7 +276,8 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
       <div class="sidebar-item" onclick="sidebarGoTo('importacoes', this)" data-page="importacoes"><span class="s-icon">📥</span><span class="s-label">Importações</span></div>
     </div>
     <div id="sidebar-footer">
-      <div class="sidebar-item" onclick="abrirConfigChecklist()"><span class="s-icon">⚙️</span><span class="s-label">Config. Checklist</span></div>
+      <div class="sidebar-item" onclick="sidebarGoTo('vt-vr',this)" data-page="vt-vr"><span class="s-icon">🚌</span><span class="s-label">VT & VR</span></div>
+    <div class="sidebar-item" onclick="abrirConfigChecklist()"><span class="s-icon">⚙️</span><span class="s-label">Config. Checklist</span></div>
     <div class="sidebar-item" onclick="fazerLogout()"><span class="s-icon">🚪</span><span class="s-label">Sair</span></div>
     </div>
   </div>
@@ -471,6 +472,74 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
     <div style="display:flex;gap:8px;margin-top:8px;">
       <button class="btn btn-orange" onclick="salvarRescisao()">💾 Salvar Rescisão</button>
       <button class="btn btn-outline" onclick="fecharRescisao()">✕ Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Feriados -->
+<div id="modal-feriados" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharFeriados()">
+  <div style="background:#fff;border-radius:16px;max-width:440px;width:95%;max-height:85vh;display:flex;flex-direction:column;">
+    <div style="padding:14px 18px;border-bottom:1px solid #e2e6f0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:15px;font-weight:700;color:#11205b;">📅 Feriados</div>
+      <button onclick="fecharFeriados()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px 16px;">
+      <div id="lista-feriados"></div>
+      <div style="display:flex;gap:6px;margin-top:10px;">
+        <input id="novo-feriado-data" type="date" style="padding:7px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"/>
+        <input id="novo-feriado-nome" placeholder="Nome do feriado" style="flex:1;padding:7px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"/>
+        <button class="btn btn-sm" onclick="adicionarFeriado()" style="background:#11205b;color:#fff;">+</button>
+      </div>
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid #e2e6f0;display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="fecharFeriados()" style="flex:1;">Fechar</button>
+      <button class="btn btn-orange" onclick="salvarFeriados()" style="flex:1;">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Afastamento -->
+<div id="modal-afastamento-vtvr" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharAfastamentoVTVR()">
+  <div style="background:#fff;border-radius:16px;max-width:380px;width:95%;">
+    <div style="padding:14px 18px;border-bottom:1px solid #e2e6f0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:15px;font-weight:700;color:#11205b;">🏥 Afastamento</div>
+      <button onclick="fecharAfastamentoVTVR()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
+    </div>
+    <div style="padding:16px 18px;">
+      <div id="afastamento-func-nome" style="font-size:14px;font-weight:600;color:#11205b;margin-bottom:14px;"></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Dias a abater do VT</label>
+          <input type="number" id="afas-vt" min="0" placeholder="0" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;"/>
+          <small style="color:#888;font-size:11px;">Dias presenciais perdidos</small>
+        </div>
+        <div class="form-group">
+          <label>Dias a abater do VR</label>
+          <input type="number" id="afas-vr" min="0" placeholder="0" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;"/>
+          <small style="color:#888;font-size:11px;">Todos os dias úteis perdidos</small>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-orange" onclick="salvarAfastamentoVTVR()">💾 Salvar</button>
+        <button class="btn btn-outline" onclick="fecharAfastamentoVTVR()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Duplicata -->
+<div id="modal-duplicata-vtvr" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:16px;max-width:420px;width:95%;">
+    <div style="padding:14px 18px;border-bottom:1px solid #e2e6f0;">
+      <div style="font-size:15px;font-weight:700;color:#11205b;">⚠️ Lançamento já existe</div>
+    </div>
+    <div style="padding:16px 18px;">
+      <div id="duplicata-info" style="font-size:13px;color:#555;margin-bottom:14px;line-height:1.6;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-orange" onclick="resolverDuplicata('substituir')" style="flex:1;">🔄 Substituir</button>
+        <button class="btn btn-outline" onclick="resolverDuplicata('manter')" style="flex:1;">✋ Manter manual</button>
+        <button class="btn btn-sm" onclick="resolverDuplicata('pular')" style="width:100%;margin-top:4px;background:#f1f5f9;color:#555;">⏭️ Pular todos os próximos</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1430,6 +1499,7 @@ function goTo(page,el){
   if(page==='rh') renderRH();
   if(page==='alertas') renderAlertas();
   if(page==='ferias-ctrl') renderFeriasCtrl();
+  if(page==='vt-vr') renderHistoricoVTVR();
   if(page==='historico'){
     const sel=document.getElementById('hist-func');
     if(sel){
@@ -1623,6 +1693,20 @@ function editarFuncionario(id){
       <div class="form-group"><label>Dependente 1</label><input id="ef-dep1_nome" value="${f.dep1_nome||''}"/></div>
       <div class="form-group"><label>Nasc. dependente</label><input type="date" id="ef-dep1_nasc" value="${f.dep1_nasc?f.dep1_nasc:''}"/></div>
       <div class="form-group"><label>CPF dependente</label><input id="ef-dep1_cpf" value="${f.dep1_cpf||''}"/></div>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#f0f4ff;border-radius:10px;border:1px solid #d5daea;">
+      <div style="font-size:12px;font-weight:700;color:#11205b;margin-bottom:10px;">🚌 Vale Transporte & 🍽️ Vale Refeição</div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Dias presenciais</label>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;">
+${(function(){var dias=[['Seg',1],['Ter',2],['Qua',3],['Qui',4],['Sex',5]];return dias.map(function(item){var d=item[0],v=item[1];return '<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" id="ef-pres-'+v+'" value="'+v+'" '+((f.diasPresenciais||[]).includes(v)?'checked':'')+'>'+d+'</label>';}).join('');})()}
+          </div>
+        </div>
+        <div class="form-group"><label>VT Trecho ida (R$)</label><input type="number" step="0.01" id="ef-vt-ida" value="${f.vtIda||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group"><label>VT Trecho volta (R$)</label><input type="number" step="0.01" id="ef-vt-volta" value="${f.vtVolta||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group"><label>Valor VR/dia (R$)</label><input type="number" step="0.01" id="ef-vr-dia" value="${f.vrDia||''}" placeholder="Ex: 35.00"/></div>
+      </div>
     </div>`;
   document.getElementById('modal-edit-func').classList.add('open');
 }
@@ -1631,6 +1715,13 @@ function salvarEditFunc(){
   const idx = funcionarios.findIndex(f=>f.id===editFuncId);
   if(idx<0) return;
   const campos = ['nome','cargo','tipo','depto','nivel','meta','salario','admissao','nascimento','est_civil','sexo','cpf','rg','celular','email_pessoal','email_corp','instrucao','naturalidade','raca_cor','endereco','pai','mae','dep1_nome','dep1_nasc','dep1_cpf'];
+  // Salvar campos VT/VR
+  var diasPres=[];
+  [1,2,3,4,5].forEach(function(d){var el=document.getElementById('ef-pres-'+d);if(el&&el.checked)diasPres.push(d);});
+  funcionarios[idx].diasPresenciais=diasPres;
+  funcionarios[idx].vtIda=parseFloat((document.getElementById('ef-vt-ida')||{value:0}).value)||0;
+  funcionarios[idx].vtVolta=parseFloat((document.getElementById('ef-vt-volta')||{value:0}).value)||0;
+  funcionarios[idx].vrDia=parseFloat((document.getElementById('ef-vr-dia')||{value:0}).value)||0;
   campos.forEach(function(c){
     const el=document.getElementById('ef-'+c);
     if(el) funcionarios[idx][c] = c==='salario'?parseFloat(el.value)||0:el.value;
@@ -5793,6 +5884,7 @@ async function loadFromSupabaseSilent(){
     // Re-renderizar a página atual
     try{
       if(pagId==='page-dashboard') renderDashboard();
+      else if(pagId==='page-vt-vr') renderHistoricoVTVR();
       else if(pagId==='page-funcionarios') renderFuncionarios();
       else if(pagId==='page-ferias-ctrl') renderFeriasCtrl();
       else if(pagId==='page-metas') renderMetas();
@@ -6255,6 +6347,446 @@ document.addEventListener('click', function(e){
   }
 });
 
+
+// ============================================================
+// MÓDULO VT & VR - Etapa 3: Cálculo
+// ============================================================
+
+var _feriadosPadrao = [
+  '2025-01-01','2025-02-28','2025-03-03','2025-03-04','2025-04-18','2025-04-21',
+  '2025-05-01','2025-06-19','2025-08-15','2025-09-07','2025-10-12','2025-11-02',
+  '2025-11-15','2025-11-20','2025-12-08','2025-12-25',
+  '2026-01-01','2026-02-16','2026-02-17','2026-04-03','2026-04-21','2026-05-01',
+  '2026-06-04','2026-08-15','2026-09-07','2026-10-12','2026-11-02','2026-11-15',
+  '2026-11-20','2026-12-08','2026-12-25',
+  '2027-01-01','2027-02-08','2027-02-09','2027-03-26','2027-04-21','2027-05-01',
+  '2027-05-24','2027-08-15','2027-09-07','2027-10-12','2027-11-02','2027-11-15',
+  '2027-11-20','2027-12-08','2027-12-25'
+];
+
+function getFeriados(){
+  try{ var s=localStorage.getItem('rt_feriados'); if(s) return JSON.parse(s); }catch(e){}
+  return _feriadosPadrao.slice();
+}
+function setFeriados(arr){
+  localStorage.setItem('rt_feriados',JSON.stringify(arr));
+  try{supa.from('configuracoes').upsert([{chave:'feriados',valor:arr}]).then(function(){});}catch(e){}
+}
+function getAfastamentosVTVR(){
+  try{ var s=localStorage.getItem('rt_afastamentos_vtvr'); if(s) return JSON.parse(s); }catch(e){}
+  return {};
+}
+function saveAfastamentosVTVR(obj){
+  localStorage.setItem('rt_afastamentos_vtvr',JSON.stringify(obj));
+  try{supa.from('configuracoes').upsert([{chave:'afastamentos_vtvr',valor:obj}]).then(function(){});}catch(e){}
+}
+function getHistoricoVTVR(){
+  try{ var s=localStorage.getItem('rt_historico_vtvr'); if(s) return JSON.parse(s); }catch(e){}
+  return [];
+}
+function saveHistoricoVTVR(arr){
+  localStorage.setItem('rt_historico_vtvr',JSON.stringify(arr));
+  try{supa.from('configuracoes').upsert([{chave:'historico_vtvr',valor:arr}]).then(function(){});}catch(e){}
+}
+
+var _vtvrCalculo = {};
+var _vtvrMesAtual = null;
+var _vtvrAnoAtual = null;
+var _vtvrAfastamentoFuncId = null;
+
+function getDiasDoMes(mes, ano){
+  var feriados=getFeriados(), ferSet=new Set(feriados), dias=[];
+  var totalDias=new Date(ano,mes,0).getDate();
+  for(var d=1;d<=totalDias;d++){
+    var dt=new Date(ano,mes-1,d), jsDay=dt.getDay();
+    var dateStr=ano+'-'+String(mes).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var isFeriado=ferSet.has(dateStr), isUtil=jsDay>=1&&jsDay<=5&&!isFeriado;
+    dias.push({date:dateStr,d:d,jsDay:jsDay,isUtil:isUtil});
+  }
+  return dias;
+}
+
+function calcularDiasFerias(funcId, mes, ano, diasDoMes, presenciais){
+  var f=funcionarios.find(function(x){return x.id===funcId;});
+  if(!f) return {diasFeriasVT:0,diasFeriasVR:0};
+  var diasFeriasVT=0,diasFeriasVR=0;
+  (f.periodos||[]).forEach(function(p){
+    (p.gozos||[]).forEach(function(g){
+      if(!g.inicio||!g.fim) return;
+      diasDoMes.forEach(function(dia){
+        if(dia.date>=g.inicio&&dia.date<=g.fim){
+          if(dia.isUtil) diasFeriasVR++;
+          if(dia.isUtil&&presenciais.indexOf(dia.jsDay)>=0) diasFeriasVT++;
+        }
+      });
+    });
+  });
+  return {diasFeriasVT:diasFeriasVT,diasFeriasVR:diasFeriasVR};
+}
+
+function fmtMoeda(v){
+  return 'R$ '+(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function calcularVTVR(){
+  var mes=parseInt(document.getElementById('vtvr-mes').value);
+  var ano=parseInt(document.getElementById('vtvr-ano').value);
+  _vtvrMesAtual=mes; _vtvrAnoAtual=ano; _vtvrCalculo={};
+  var diasDoMes=getDiasDoMes(mes,ano);
+  var diasUteisTotal=diasDoMes.filter(function(d){return d.isUtil;}).length;
+  var savedAfas=getAfastamentosVTVR();
+  var nomeDias=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+  var funcs=funcionarios.filter(function(f){
+    return f.ativo!==false&&f.tipo!=='PJ'&&f.tipo!=='Autônomo';
+  }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  var totalVT=0,totalVR=0,rows='';
+  funcs.forEach(function(f){
+    var presenciais=(f.diasPresenciais||[]);
+    var vtIda=parseFloat(f.vtIda)||0,vtVolta=parseFloat(f.vtVolta)||0,vrDia=parseFloat(f.vrDia)||0;
+    var diasVTBruto=diasDoMes.filter(function(d){return d.isUtil&&presenciais.indexOf(d.jsDay)>=0;}).length;
+    var ferias=calcularDiasFerias(f.id,mes,ano,diasDoMes,presenciais);
+    var afasKey=f.id+'_'+mes+'_'+ano;
+    var afas=savedAfas[afasKey]||{afasVT:0,afasVR:0};
+    var diasVT=Math.max(0,diasVTBruto-ferias.diasFeriasVT-(afas.afasVT||0));
+    var diasVR=Math.max(0,diasUteisTotal-ferias.diasFeriasVR-(afas.afasVR||0));
+    var totalFuncVT=diasVT*(vtIda+vtVolta),totalFuncVR=diasVR*vrDia;
+    totalVT+=totalFuncVT; totalVR+=totalFuncVR;
+    _vtvrCalculo[f.id]={funcId:f.id,funcNome:f.nome,diasVTBruto:diasVTBruto,
+      diasFeriasVT:ferias.diasFeriasVT,diasFeriasVR:ferias.diasFeriasVR,
+      afasVT:afas.afasVT||0,afasVR:afas.afasVR||0,
+      diasVT:diasVT,diasVR:diasVR,diasUteisTotal:diasUteisTotal,
+      vtIda:vtIda,vtVolta:vtVolta,vrDia:vrDia,
+      totalVT:totalFuncVT,totalVR:totalFuncVR,total:totalFuncVT+totalFuncVR};
+    var escalaStr=presenciais.map(function(d){return nomeDias[d]||'';}).join('/')||'--';
+    var afasLabel=(afas.afasVT||afas.afasVR)?'Afas: '+(afas.afasVT||0)+'vt/'+(afas.afasVR||0)+'vr':'+ Afas.';
+    rows+='<tr style="border-bottom:1px solid #e2e6f0;">'
+      +'<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+f.nome+'<br><span style="font-size:10px;color:#888;">'+f.cargo+'</span></td>'
+      +'<td style="text-align:center;font-size:12px;">'+escalaStr+'</td>'
+      +'<td style="text-align:center;font-size:12px;">'+diasVT+'<span style="color:#888;font-size:10px;"> /'+diasVTBruto+'</span></td>'
+      +'<td style="text-align:center;"><button class="vtvr-afas-btn" data-fid="'+f.id+'" style="background:#f0f4ff;border:1px solid #d5daea;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;">'+afasLabel+'</button></td>'
+      +'<td style="text-align:center;font-size:12px;">'+diasVR+'<span style="color:#888;font-size:10px;"> /'+diasUteisTotal+'</span></td>'
+      +'<td style="text-align:right;font-size:12px;font-weight:600;color:#11205b;">'+fmtMoeda(totalFuncVT)+'</td>'
+      +'<td style="text-align:right;font-size:12px;font-weight:600;color:#f94603;">'+fmtMoeda(totalFuncVR)+'</td>'
+      +'<td style="text-align:right;font-size:12px;font-weight:700;">'+fmtMoeda(totalFuncVT+totalFuncVR)+'</td>'
+      +'</tr>';
+  });
+  document.getElementById('vtvr-tbody').innerHTML=rows||'<tr><td colspan="8" style="text-align:center;padding:30px;color:#888;">Nenhum funcionário CLT ativo. Configure a escala no cadastro.</td></tr>';
+  document.getElementById('vtvr-total-vt').textContent=fmtMoeda(totalVT);
+  document.getElementById('vtvr-total-vr').textContent=fmtMoeda(totalVR);
+  document.getElementById('vtvr-total-geral').textContent=fmtMoeda(totalVT+totalVR);
+  document.getElementById('vtvr-resumo').style.display='grid';
+  document.getElementById('vtvr-btn-fechar').style.display='block';
+}
+
+document.addEventListener('click',function(e){
+  var btn=e.target.closest('.vtvr-afas-btn');
+  if(btn){abrirAfastamentoVTVR(btn.dataset.fid);}
+});
+
+function abrirAfastamentoVTVR(funcId){
+  _vtvrAfastamentoFuncId=funcId;
+  var f=funcionarios.find(function(x){return x.id===funcId;});
+  document.getElementById('afastamento-func-nome').textContent=f?f.nome:'';
+  var afasKey=funcId+'_'+_vtvrMesAtual+'_'+_vtvrAnoAtual;
+  var afas=(getAfastamentosVTVR()[afasKey])||{afasVT:0,afasVR:0};
+  document.getElementById('afas-vt').value=afas.afasVT||0;
+  document.getElementById('afas-vr').value=afas.afasVR||0;
+  document.getElementById('modal-afastamento-vtvr').style.display='flex';
+}
+function fecharAfastamentoVTVR(){
+  document.getElementById('modal-afastamento-vtvr').style.display='none';
+  _vtvrAfastamentoFuncId=null;
+}
+function salvarAfastamentoVTVR(){
+  if(!_vtvrAfastamentoFuncId) return;
+  var afasKey=_vtvrAfastamentoFuncId+'_'+_vtvrMesAtual+'_'+_vtvrAnoAtual;
+  var saved=getAfastamentosVTVR();
+  saved[afasKey]={afasVT:parseInt(document.getElementById('afas-vt').value)||0,afasVR:parseInt(document.getElementById('afas-vr').value)||0};
+  saveAfastamentosVTVR(saved);
+  fecharAfastamentoVTVR();
+  calcularVTVR();
+  toast('Afastamento salvo!');
+}
+
+function abrirFeriados(){renderListaFeriados();document.getElementById('modal-feriados').style.display='flex';}
+function fecharFeriados(){document.getElementById('modal-feriados').style.display='none';}
+function renderListaFeriados(){
+  var feriados=getFeriados().sort();
+  var html=feriados.map(function(f){
+    var p=f.split('-');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f0f0f0;">'
+      +'<span style="font-size:13px;">'+p[2]+'/'+p[1]+'/'+p[0]+'</span>'
+      +'<button onclick="removerFeriado(\''+f+'\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:11px;">X</button>'
+      +'</div>';
+  }).join('');
+  document.getElementById('lista-feriados').innerHTML=html||'<p style="color:#888;font-size:13px;">Nenhum feriado cadastrado</p>';
+}
+function adicionarFeriado(){
+  var data=document.getElementById('novo-feriado-data').value;
+  if(!data){toast('Informe a data');return;}
+  var feriados=getFeriados();
+  if(feriados.indexOf(data)<0) feriados.push(data);
+  setFeriados(feriados);
+  document.getElementById('novo-feriado-data').value='';
+  renderListaFeriados();
+}
+function removerFeriado(data){setFeriados(getFeriados().filter(function(f){return f!==data;}));renderListaFeriados();}
+function salvarFeriados(){fecharFeriados();toast('Feriados salvos!');if(_vtvrMesAtual) calcularVTVR();}
+
+function renderHistoricoVTVR(){
+  var el=document.getElementById('vtvr-historico');
+  if(!el) return;
+  var hist=getHistoricoVTVR();
+  if(!hist.length){el.innerHTML='<p style="color:#888;font-size:13px;">Nenhum mes fechado ainda.</p>';return;}
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  el.innerHTML=hist.map(function(h){
+    var tVT=0,tVR=0;
+    Object.values(h.dados).forEach(function(d){tVT+=d.totalVT||0;tVR+=d.totalVR||0;});
+    return '<div style="background:#fff;border:1px solid #e2e6f0;border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'
+      +'<div><div style="font-size:13px;font-weight:700;color:#11205b;">'+meses[h.mes]+'/'+h.ano+'</div>'
+      +'<div style="font-size:11px;color:#888;">Fechado em '+new Date(h.fechadoEm).toLocaleDateString('pt-BR')+'</div></div>'
+      +'<div style="display:flex;gap:16px;align-items:center;">'
+      +'<span style="font-size:12px;">VT: <strong>'+fmtMoeda(tVT)+'</strong></span>'
+      +'<span style="font-size:12px;">VR: <strong>'+fmtMoeda(tVR)+'</strong></span>'
+      +'<button onclick="verMesVTVR('+h.mes+','+h.ano+')" style="background:#f0f4ff;border:1px solid #d5daea;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;">Ver</button>'
+      +'<button onclick="editarMesVTVR('+h.mes+','+h.ano+')" style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;color:#92400e;">Editar</button>'
+      +'<button onclick="excluirMesVTVR('+h.mes+','+h.ano+')" style="background:#fee2e2;border:1px solid #dc2626;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;color:#dc2626;">Excluir</button>'
+      +'</div></div>';
+  }).join('');
+}
+function verMesVTVR(mes,ano){
+  document.getElementById('vtvr-mes').value=mes;
+  document.getElementById('vtvr-ano').value=ano;
+  calcularVTVR();
+}
+
+async function carregarVTVRDoSupabase(){
+  try{
+    var res=await supa.from('configuracoes').select('chave,valor').in('chave',['historico_vtvr','afastamentos_vtvr','feriados']);
+    if(res.data){res.data.forEach(function(r){
+      if(r.chave==='historico_vtvr') localStorage.setItem('rt_historico_vtvr',JSON.stringify(r.valor));
+      if(r.chave==='afastamentos_vtvr') localStorage.setItem('rt_afastamentos_vtvr',JSON.stringify(r.valor));
+      if(r.chave==='feriados') localStorage.setItem('rt_feriados',JSON.stringify(r.valor));
+    });}
+    renderHistoricoVTVR();
+  }catch(e){console.warn('VT/VR load error:',e);}
+}
+
+
+// ============================================================
+// MÓDULO VT & VR - Etapa 4: Fechar mês, lançamentos e exportação
+// ============================================================
+
+var _vtvrDuplicataFila = [];
+var _vtvrDuplicataAtual = null;
+var _vtvrDuplicataPularTodos = false;
+
+function fecharMesVTVR(){
+  if(!_vtvrMesAtual || Object.keys(_vtvrCalculo).length===0){
+    toast('Calcule o mês primeiro.');return;
+  }
+  // Limpar lançamentos VT/VR zerados anteriores deste mês
+  lancamentos = lancamentos.filter(function(l){
+    if(l.mes!==_vtvrMesAtual||l.ano!==_vtvrAnoAtual) return true;
+    if(l.obs==='VT/VR gerado automaticamente'&&l.total===0) return false;
+    return true;
+  });
+  _vtvrDuplicataFila = [];
+  _vtvrDuplicataPularTodos = false;
+
+  Object.values(_vtvrCalculo).forEach(function(c){
+    if((c.totalVT||0)===0&&(c.totalVR||0)===0) return; // ignorar zerados
+    // Verificar qualquer lançamento VT/VR já existente para esse func/mes/ano
+    var existeVT = lancamentos.find(function(l){
+      return l.funcId===c.funcId && l.mes===_vtvrMesAtual && l.ano===_vtvrAnoAtual
+        && l.dados && (l.dados['l-vt']||0)>0;
+    });
+    var existeVR = lancamentos.find(function(l){
+      return l.funcId===c.funcId && l.mes===_vtvrMesAtual && l.ano===_vtvrAnoAtual
+        && l.dados && (l.dados['l-vr']||0)>0;
+    });
+    if(existeVT||existeVR){
+      _vtvrDuplicataFila.push({calculo:c,existeVT:existeVT,existeVR:existeVR});
+    }
+  });
+
+  if(_vtvrDuplicataFila.length>0){
+    proximaDuplicataVTVR();
+  } else {
+    criarTodosLancamentosVTVR();
+  }
+}
+
+function proximaDuplicataVTVR(){
+  if(_vtvrDuplicataFila.length===0){
+    criarTodosLancamentosVTVR();return;
+  }
+  _vtvrDuplicataAtual = _vtvrDuplicataFila.shift();
+  var c = _vtvrDuplicataAtual.calculo;
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var info = '<strong>'+c.funcNome+'</strong> — '+meses[_vtvrMesAtual]+'/'+_vtvrAnoAtual+'<br>';
+  if(_vtvrDuplicataAtual.existeVT) info += '• VT manual: <strong>R$ '+(_vtvrDuplicataAtual.existeVT.dados['l-vt']||0).toFixed(2)+'</strong> → Novo: <strong>'+fmtMoeda(c.totalVT)+'</strong><br>';
+  if(_vtvrDuplicataAtual.existeVR) info += '• VR manual: <strong>R$ '+(_vtvrDuplicataAtual.existeVR.dados['l-vr']||0).toFixed(2)+'</strong> → Novo: <strong>'+fmtMoeda(c.totalVR)+'</strong><br>';
+  info += '<br>O que deseja fazer?';
+  document.getElementById('duplicata-info').innerHTML = info;
+  document.getElementById('modal-duplicata-vtvr').style.display='flex';
+}
+
+function resolverDuplicata(acao){
+  document.getElementById('modal-duplicata-vtvr').style.display='none';
+  if(acao==='pular'){
+    _vtvrDuplicataFila=[];
+    criarTodosLancamentosVTVR();return;
+  }
+  if(acao==='substituir' && _vtvrDuplicataAtual){
+    var c = _vtvrDuplicataAtual.calculo;
+    lancamentos = lancamentos.filter(function(l){
+      if(l.funcId!==c.funcId||l.mes!==_vtvrMesAtual||l.ano!==_vtvrAnoAtual) return true;
+      if(l.dados&&((l.dados['l-vt']||0)>0||(l.dados['l-vr']||0)>0)) return false;
+      return true;
+    });
+    criarLancamentoVTVR(c);
+  }
+  // 'manter' = não faz nada para esse funcionário
+  proximaDuplicataVTVR();
+}
+
+function criarLancamentoVTVR(c){
+  // Só criar se tiver valor
+  if((c.totalVT||0)===0 && (c.totalVR||0)===0) return false;
+  var fNome=(funcionarios.find(function(f){return f.id===c.funcId;})||{}).nome||c.funcNome;
+  var dadosLanc={};
+  CAMPOS.forEach(function(campo){dadosLanc[campo.id]=0;});
+  dadosLanc['l-vt']=Math.round(c.totalVT*100)/100;
+  dadosLanc['l-vr']=Math.round(c.totalVR*100)/100;
+  var total=dadosLanc['l-vt']+dadosLanc['l-vr'];
+  lancamentos.push({
+    id:'l_vtvr_'+c.funcId+'_'+_vtvrMesAtual+'_'+_vtvrAnoAtual,
+    funcId:c.funcId,funcNome:fNome,
+    mes:_vtvrMesAtual,ano:_vtvrAnoAtual,
+    dados:dadosLanc,obs:'VT/VR gerado automaticamente',obsExtras:'',
+    total:total,createdAt:new Date().toISOString()
+  });
+  return true;
+}
+
+function criarTodosLancamentosVTVR(){
+  var criados=0;
+  Object.values(_vtvrCalculo).forEach(function(c){
+    if((c.totalVT||0)===0&&(c.totalVR||0)===0) return; // pular zerados
+    var jaExiste=lancamentos.find(function(l){
+      return l.funcId===c.funcId&&l.mes===_vtvrMesAtual&&l.ano===_vtvrAnoAtual
+        &&l.dados&&((l.dados['l-vt']||0)>0||(l.dados['l-vr']||0)>0);
+    });
+    if(!jaExiste){if(criarLancamentoVTVR(c)) criados++;}
+  });
+
+  // Salvar histórico
+  var hist=getHistoricoVTVR();
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var snapshot={
+    mes:_vtvrMesAtual,ano:_vtvrAnoAtual,
+    label:meses[_vtvrMesAtual]+'/'+_vtvrAnoAtual,
+    fechadoEm:new Date().toISOString(),
+    dados:JSON.parse(JSON.stringify(_vtvrCalculo))
+  };
+  var existeIdx=hist.findIndex(function(h){return h.mes===_vtvrMesAtual&&h.ano===_vtvrAnoAtual;});
+  if(existeIdx>=0) hist[existeIdx]=snapshot; else hist.unshift(snapshot);
+  saveHistoricoVTVR(hist);
+  save();
+  renderHistoricoVTVR();
+  toast('Mes fechado! '+criados+' lancamentos criados.');
+}
+
+function exportarVTVRExcel(){
+  if(!_vtvrMesAtual||Object.keys(_vtvrCalculo).length===0){toast('Calcule primeiro.');return;}
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var nomeDias=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+  var rows=[['Funcionario','Cargo','Escala','Dias VT Bruto','Ferias VT','Afas. VT','Dias VT Liq.','VT Ida','VT Volta','Total VT','Dias Uteis','Ferias VR','Afas. VR','Dias VR Liq.','VR/dia','Total VR','Total Geral']];
+  Object.values(_vtvrCalculo).forEach(function(c){
+    var f=funcionarios.find(function(x){return x.id===c.funcId;})||{};
+    var escala=(f.diasPresenciais||[]).map(function(d){return nomeDias[d]||'';}).join('/');
+    rows.push([c.funcNome,f.cargo||'',escala,c.diasVTBruto,c.diasFeriasVT,c.afasVT,c.diasVT,c.vtIda,c.vtVolta,c.totalVT,c.diasUteisTotal,c.diasFeriasVR,c.afasVR,c.diasVR,c.vrDia,c.totalVR,c.total]);
+  });
+  var BOM='\uFEFF';
+  var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(';');}).join('\n');
+  var blob=new Blob([BOM+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='VTVR_'+meses[_vtvrMesAtual]+'_'+_vtvrAnoAtual+'.csv';
+  a.click();URL.revokeObjectURL(url);
+  toast('Excel exportado!');
+}
+
+function exportarVTVRPDF(){
+  if(!_vtvrMesAtual||Object.keys(_vtvrCalculo).length===0){toast('Calcule primeiro.');return;}
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var nomeDias=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+  var titulo='VT & VR - '+meses[_vtvrMesAtual]+'/'+_vtvrAnoAtual;
+  var totalVT=0,totalVR=0;
+  var linhas=Object.values(_vtvrCalculo).map(function(c){
+    var f=funcionarios.find(function(x){return x.id===c.funcId;})||{};
+    var escala=(f.diasPresenciais||[]).map(function(d){return nomeDias[d]||'';}).join('/')||'--';
+    totalVT+=c.totalVT;totalVR+=c.totalVR;
+    return '<tr><td>'+c.funcNome+'</td><td>'+escala+'</td>'
+      +'<td style="text-align:center;">'+c.diasVT+'</td>'
+      +'<td style="text-align:center;">'+c.diasVR+'</td>'
+      +'<td style="text-align:right;">'+fmtMoeda(c.totalVT)+'</td>'
+      +'<td style="text-align:right;">'+fmtMoeda(c.totalVR)+'</td>'
+      +'<td style="text-align:right;font-weight:700;">'+fmtMoeda(c.total)+'</td></tr>';
+  }).join('');
+  linhas+='<tr style="background:#f0f4ff;font-weight:700;"><td colspan="4">TOTAL</td>'
+    +'<td style="text-align:right;">'+fmtMoeda(totalVT)+'</td>'
+    +'<td style="text-align:right;">'+fmtMoeda(totalVR)+'</td>'
+    +'<td style="text-align:right;">'+fmtMoeda(totalVT+totalVR)+'</td></tr>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title>'
+    +'<style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}'
+    +'h2{color:#11205b;}table{width:100%;border-collapse:collapse;}'
+    +'th{background:#11205b;color:#fff;padding:6px 8px;text-align:left;}'
+    +'td{padding:5px 8px;border-bottom:1px solid #eee;}'
+    +'@media print{button{display:none;}}</style></head><body>'
+    +'<h2>'+titulo+'</h2>'
+    +'<p style="color:#666;font-size:10px;">Gerado em '+new Date().toLocaleDateString('pt-BR')
+    +' — '+Object.keys(_vtvrCalculo).length+' funcionario(s)</p>'
+    +'<table><thead><tr><th>Funcionario</th><th>Escala</th><th>Dias VT</th>'
+    +'<th>Dias VR</th><th>Total VT</th><th>Total VR</th><th>Total</th></tr></thead>'
+    +'<tbody>'+linhas+'</tbody></table>'
+    +'<br><button onclick="window.print()" style="background:#11205b;color:#fff;border:none;'
+    +'padding:8px 16px;border-radius:6px;cursor:pointer;">Imprimir / Salvar PDF</button>'
+    +'</body></html>';
+  var win=window.open('','_blank');
+  if(win){win.document.write(html);win.document.close();}
+}
+
+
+function excluirMesVTVR(mes, ano){
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  if(!confirm('Excluir fechamento de '+meses[mes]+'/'+ano+'?\nIsso vai remover os lancamentos VT/VR desse mes da aba Lancamentos.')) return;
+  // Remover lançamentos VT/VR do mês
+  lancamentos = lancamentos.filter(function(l){
+    if(l.mes!==mes||l.ano!==ano) return true;
+    if(l.dados&&((l.dados['l-vt']||0)>0||(l.dados['l-vr']||0)>0)) return false;
+    return true;
+  });
+  // Remover do histórico
+  var hist = getHistoricoVTVR().filter(function(h){return !(h.mes===mes&&h.ano===ano);});
+  saveHistoricoVTVR(hist);
+  save();
+  renderHistoricoVTVR();
+  toast('Mes excluido com sucesso!');
+}
+
+function editarMesVTVR(mes, ano){
+  // Carregar o mês na tabela para edição
+  document.getElementById('vtvr-mes').value = mes;
+  document.getElementById('vtvr-ano').value = ano;
+  // Navegar para a aba VT/VR
+  sidebarGoTo('vt-vr', document.querySelector('[data-page="vt-vr"]'));
+  // Calcular para mostrar os dados atuais
+  calcularVTVR();
+  toast('Ajuste os valores e feche o mes novamente para atualizar os lancamentos.');
+}
+
 try{initSelects();}catch(e){console.warn(e);}
 try{populateDeptoSelect();}catch(e){console.warn(e);}
 try{renderFuncionarios();}catch(e){console.warn(e);}
@@ -6267,6 +6799,7 @@ setTimeout(function(){
       loadFromSupabase();
       setTimeout(function(){iniciarRealtime();}, 2000);
       setTimeout(function(){carregarChecklistDoSupabase();}, 1000);
+      setTimeout(function(){carregarVTVRDoSupabase();}, 1500);
     }
   });
 }, 500);
@@ -6466,6 +6999,62 @@ setTimeout(function(){
   </div>
 </div>
 
+</div>
+
+
+<!-- ========== ABA VT & VR ========== -->
+<div id="page-vt-vr" class="page">
+  <div class="page-title">🚌 VT & VR</div>
+  <div class="page-sub">Cálculo mensal de Vale Transporte e Vale Refeição</div>
+  <div class="filter-bar" style="margin-bottom:16px;">
+    <select id="vtvr-mes" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
+      <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+      <option value="3">Março</option><option value="4">Abril</option>
+      <option value="5">Maio</option><option value="6">Junho</option>
+      <option value="7">Julho</option><option value="8">Agosto</option>
+      <option value="9">Setembro</option><option value="10">Outubro</option>
+      <option value="11">Novembro</option><option value="12">Dezembro</option>
+    </select>
+    <select id="vtvr-ano" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
+      <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+    </select>
+    <button class="btn btn-primary" onclick="calcularVTVR()" style="background:#11205b;">🔄 Calcular</button>
+    <button class="btn btn-sm" onclick="abrirFeriados()" style="background:#6b7280;color:#fff;">📅 Feriados</button>
+    <button class="btn btn-sm" onclick="exportarVTVRExcel()" style="background:#1d6f42;color:#fff;">📊 Excel</button>
+    <button class="btn btn-sm" onclick="exportarVTVRPDF()" style="background:#dc2626;color:#fff;">🖨️ PDF</button>
+  </div>
+  <div id="vtvr-resumo" style="display:none;margin-bottom:16px;grid-template-columns:repeat(3,1fr);gap:12px;">
+    <div class="metric-card"><div class="metric-label">Total VT</div><div class="metric-value" id="vtvr-total-vt" style="color:#11205b;">R$ 0,00</div></div>
+    <div class="metric-card"><div class="metric-label">Total VR</div><div class="metric-value" id="vtvr-total-vr" style="color:#f94603;">R$ 0,00</div></div>
+    <div class="metric-card"><div class="metric-label">Total Geral</div><div class="metric-value" id="vtvr-total-geral" style="color:#16a34a;">R$ 0,00</div></div>
+  </div>
+  <div class="table-wrap" style="background:#fff;border-radius:12px;border:1px solid #e2e6f0;overflow:auto;">
+    <table id="vtvr-table" style="min-width:900px;width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="background:#11205b;color:#fff;">
+          <th style="padding:10px 12px;text-align:left;font-size:12px;">Funcionário</th>
+          <th style="padding:10px 12px;text-align:center;font-size:12px;">Escala</th>
+          <th style="padding:10px 12px;text-align:center;font-size:12px;">Dias VT</th>
+          <th style="padding:10px 12px;text-align:center;font-size:12px;">Afastamento</th>
+          <th style="padding:10px 12px;text-align:center;font-size:12px;">Dias VR</th>
+          <th style="padding:10px 12px;text-align:right;font-size:12px;">VT (R$)</th>
+          <th style="padding:10px 12px;text-align:right;font-size:12px;">VR (R$)</th>
+          <th style="padding:10px 12px;text-align:right;font-size:12px;">Total (R$)</th>
+        </tr>
+      </thead>
+      <tbody id="vtvr-tbody">
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:#888;">Selecione o mês e clique em Calcular</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="vtvr-btn-fechar" style="display:none;margin-top:16px;text-align:right;">
+    <button class="btn btn-orange" onclick="fecharMesVTVR()">✅ Fechar Mês e Criar Lançamentos</button>
+  </div>
+  <div style="margin-top:24px;">
+    <div style="font-size:14px;font-weight:700;color:#11205b;margin-bottom:10px;">📋 Histórico de Meses Fechados</div>
+    <div id="vtvr-historico"><p style="color:#888;font-size:13px;">Nenhum mês fechado ainda.</p></div>
+  </div>
+</div>
 
 
     </div><!-- /main-content-area -->
