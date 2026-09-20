@@ -6762,11 +6762,20 @@ function exportarVTVRPDF(){
 function excluirMesVTVR(mes, ano){
   var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   if(!confirm('Excluir fechamento de '+meses[mes]+'/'+ano+'?\nIsso vai remover os lancamentos VT/VR desse mes da aba Lancamentos.')) return;
-  // Remover lançamentos VT/VR do mês
+  // Encontrar IDs dos lançamentos VT/VR a remover
+  var idsRemover = [];
+  lancamentos.forEach(function(l){
+    if(l.mes===mes&&l.ano===ano&&l.obs==='VT/VR gerado automaticamente'){
+      idsRemover.push(l.id);
+    }
+  });
+  // Remover do array local
   lancamentos = lancamentos.filter(function(l){
-    if(l.mes!==mes||l.ano!==ano) return true;
-    if(l.dados&&((l.dados['l-vt']||0)>0||(l.dados['l-vr']||0)>0)) return false;
-    return true;
+    return !(l.mes===mes&&l.ano===ano&&l.obs==='VT/VR gerado automaticamente');
+  });
+  // Remover do Supabase
+  idsRemover.forEach(function(id){
+    try{supa.from('lancamentos').delete().eq('id',id).then(function(){});}catch(e){}
   });
   // Remover do histórico
   var hist = getHistoricoVTVR().filter(function(h){return !(h.mes===mes&&h.ano===ano);});
