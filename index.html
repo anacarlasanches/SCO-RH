@@ -1499,7 +1499,7 @@ function goTo(page,el){
   if(page==='rh') renderRH();
   if(page==='alertas') renderAlertas();
   if(page==='ferias-ctrl') renderFeriasCtrl();
-  if(page==='vt-vr') renderHistoricoVTVR();
+  if(page==='vt-vr'){renderHistoricoVTVR();renderHistoricoCartoes();}
   if(page==='historico'){
     const sel=document.getElementById('hist-func');
     if(sel){
@@ -1703,8 +1703,21 @@ function editarFuncionario(id){
 ${(function(){var dias=[['Seg',1],['Ter',2],['Qua',3],['Qui',4],['Sex',5]];return dias.map(function(item){var d=item[0],v=item[1];return '<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;"><input type="checkbox" id="ef-pres-'+v+'" value="'+v+'" '+((f.diasPresenciais||[]).includes(v)?'checked':'')+'>'+d+'</label>';}).join('');})()}
           </div>
         </div>
-        <div class="form-group"><label>VT Trecho ida (R$)</label><input type="number" step="0.01" id="ef-vt-ida" value="${f.vtIda||''}" placeholder="Ex: 4.80"/></div>
-        <div class="form-group"><label>VT Trecho volta (R$)</label><input type="number" step="0.01" id="ef-vt-volta" value="${f.vtVolta||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Tipo de VT</label>
+          <select id="ef-tipo-vt" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;">
+            <option value="ifood" ${(f.tipoVT||'ifood')==='ifood'?'selected':''}>Ifood Mobilidade</option>
+            <option value="bhbus" ${(f.tipoVT||'')==='bhbus'?'selected':''}>Cartão BHBus</option>
+            <option value="otimo" ${(f.tipoVT||'')==='otimo'?'selected':''}>Cartão Ótimo</option>
+            <option value="bhbus+otimo" ${(f.tipoVT||'')==='bhbus+otimo'?'selected':''}>BHBus + Ótimo</option>
+          </select>
+        </div>
+        <div class="form-group"><label>VT Ida Ifood (R$)</label><input type="number" step="0.01" id="ef-vt-ida" value="${f.vtIda||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group"><label>VT Volta Ifood (R$)</label><input type="number" step="0.01" id="ef-vt-volta" value="${f.vtVolta||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group"><label>VT Ida BHBus (R$)</label><input type="number" step="0.01" id="ef-vt-ida-bhbus" value="${f.vtIdaBhbus||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group"><label>VT Volta BHBus (R$)</label><input type="number" step="0.01" id="ef-vt-volta-bhbus" value="${f.vtVoltaBhbus||''}" placeholder="Ex: 4.80"/></div>
+        <div class="form-group"><label>VT Ida Ótimo (R$)</label><input type="number" step="0.01" id="ef-vt-ida-otimo" value="${f.vtIdaOtimo||''}" placeholder="Ex: 5.20"/></div>
+        <div class="form-group"><label>VT Volta Ótimo (R$)</label><input type="number" step="0.01" id="ef-vt-volta-otimo" value="${f.vtVoltaOtimo||''}" placeholder="Ex: 5.20"/></div>
         <div class="form-group"><label>Valor VR/dia (R$)</label><input type="number" step="0.01" id="ef-vr-dia" value="${f.vrDia||''}" placeholder="Ex: 35.00"/></div>
       </div>
     </div>`;
@@ -1719,8 +1732,13 @@ function salvarEditFunc(){
   var diasPres=[];
   [1,2,3,4,5].forEach(function(d){var el=document.getElementById('ef-pres-'+d);if(el&&el.checked)diasPres.push(d);});
   funcionarios[idx].diasPresenciais=diasPres;
+  funcionarios[idx].tipoVT=(document.getElementById('ef-tipo-vt')||{value:'ifood'}).value||'ifood';
   funcionarios[idx].vtIda=parseFloat((document.getElementById('ef-vt-ida')||{value:0}).value)||0;
   funcionarios[idx].vtVolta=parseFloat((document.getElementById('ef-vt-volta')||{value:0}).value)||0;
+  funcionarios[idx].vtIdaBhbus=parseFloat((document.getElementById('ef-vt-ida-bhbus')||{value:0}).value)||0;
+  funcionarios[idx].vtVoltaBhbus=parseFloat((document.getElementById('ef-vt-volta-bhbus')||{value:0}).value)||0;
+  funcionarios[idx].vtIdaOtimo=parseFloat((document.getElementById('ef-vt-ida-otimo')||{value:0}).value)||0;
+  funcionarios[idx].vtVoltaOtimo=parseFloat((document.getElementById('ef-vt-volta-otimo')||{value:0}).value)||0;
   funcionarios[idx].vrDia=parseFloat((document.getElementById('ef-vr-dia')||{value:0}).value)||0;
   campos.forEach(function(c){
     const el=document.getElementById('ef-'+c);
@@ -6759,7 +6777,7 @@ function exportarVTVRPDF(){
 }
 
 
-function excluirMesVTVR(mes, ano){
+async function excluirMesVTVR(mes, ano){
   var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   if(!confirm('Excluir fechamento de '+meses[mes]+'/'+ano+'?\nIsso vai remover os lancamentos VT/VR desse mes da aba Lancamentos.')) return;
   // Encontrar IDs dos lançamentos VT/VR a remover
@@ -6769,13 +6787,13 @@ function excluirMesVTVR(mes, ano){
       idsRemover.push(l.id);
     }
   });
+  // Deletar do Supabase PRIMEIRO (aguardar)
+  for(var i=0;i<idsRemover.length;i++){
+    try{await supa.from('lancamentos').delete().eq('id',idsRemover[i]);}catch(e){console.warn(e);}
+  }
   // Remover do array local
   lancamentos = lancamentos.filter(function(l){
     return !(l.mes===mes&&l.ano===ano&&l.obs==='VT/VR gerado automaticamente');
-  });
-  // Remover do Supabase
-  idsRemover.forEach(function(id){
-    try{supa.from('lancamentos').delete().eq('id',id).then(function(){});}catch(e){}
   });
   // Remover do histórico
   var hist = getHistoricoVTVR().filter(function(h){return !(h.mes===mes&&h.ano===ano);});
@@ -6796,6 +6814,299 @@ function editarMesVTVR(mes, ano){
   toast('Ajuste os valores e feche o mes novamente para atualizar os lancamentos.');
 }
 
+
+// ============================================================
+// MÓDULO VT & VR - Cartões BHBus e Ótimo
+// ============================================================
+
+var _cartoesCalculo = {}; // {funcId: {bhbus:{dias,saldo,recarga}, otimo:{dias,saldo,recarga}}}
+var _cartoesDataCompra = null;
+var _cartoesHistorico = [];
+
+function getHistoricoCartoes(){
+  try{ var s=localStorage.getItem('rt_historico_cartoes'); if(s) return JSON.parse(s); }catch(e){}
+  return [];
+}
+function saveHistoricoCartoes(arr){
+  localStorage.setItem('rt_historico_cartoes',JSON.stringify(arr));
+  try{supa.from('configuracoes').upsert([{chave:'historico_cartoes',valor:arr}]).then(function(){});}catch(e){}
+}
+
+function getSaldosCartoes(){
+  try{ var s=localStorage.getItem('rt_saldos_cartoes'); if(s) return JSON.parse(s); }catch(e){}
+  return {};
+}
+function saveSaldosCartoes(obj){
+  localStorage.setItem('rt_saldos_cartoes',JSON.stringify(obj));
+  try{supa.from('configuracoes').upsert([{chave:'saldos_cartoes',valor:obj}]).then(function(){});}catch(e){}
+}
+
+function getDiasRestantesMes(dataCompra, mes, ano, presenciais){
+  // Dias presenciais a partir de dataCompra+1 até fim do mês, +1 de segurança
+  var feriados = getFeriados();
+  var ferSet = new Set(feriados);
+  var totalDias = new Date(ano, mes, 0).getDate();
+  var dias = 0;
+  for(var d=1; d<=totalDias; d++){
+    var dateStr = ano+'-'+String(mes).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    if(dateStr <= dataCompra) continue; // só dias APÓS a compra
+    var dt = new Date(ano, mes-1, d);
+    var jsDay = dt.getDay();
+    var isFeriado = ferSet.has(dateStr);
+    var isUtil = jsDay>=1 && jsDay<=5 && !isFeriado;
+    if(isUtil && presenciais.indexOf(jsDay)>=0) dias++;
+  }
+  return dias + 1; // +1 dia de segurança
+}
+
+function calcularCartoes(){
+  var dataCompra = document.getElementById('cartoes-data-compra').value;
+  if(!dataCompra){toast('Informe a data da compra.');return;}
+  _cartoesDataCompra = dataCompra;
+  _cartoesCalculo = {};
+
+  var mesRef = parseInt(document.getElementById('cartoes-mes-ref').value);
+  var anoRef = parseInt(document.getElementById('cartoes-ano-ref').value);
+
+  var diasDoMes = getDiasDoMes(mesRef, anoRef);
+  var savedAfasCart = getSaldosCartoes(); // reutilizamos para afastamentos tb
+  var saldos = getSaldosCartoes();
+
+  var funcsBhbus = funcionarios.filter(function(f){
+    return f.ativo!==false && (f.tipoVT==='bhbus'||f.tipoVT==='bhbus+otimo');
+  }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+
+  var funcsOtimo = funcionarios.filter(function(f){
+    return f.ativo!==false && (f.tipoVT==='otimo'||f.tipoVT==='bhbus+otimo');
+  }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+
+  var meses=['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var labelMes = meses[mesRef]+'/'+anoRef;
+
+  var thStyle='padding:8px 12px;font-size:11px;text-align:left;';
+  var thC='padding:8px 12px;font-size:11px;text-align:center;';
+  var thR='padding:8px 12px;font-size:11px;text-align:right;';
+  var thead='<thead><tr style="background:#11205b;color:#fff;">'
+    +'<th style="'+thStyle+'">Funcionário</th>'
+    +'<th style="'+thC+'">Dias VT</th>'
+    +'<th style="'+thC+'">Afas. VT</th>'
+    +'<th style="'+thR+'">Custo VT</th>'
+    +'<th style="'+thC+'">Saldo Cartão</th>'
+    +'<th style="'+thR+'">Recarga</th>'
+    +'</tr></thead>';
+
+  function buildRows(funcs, tipoCartao, vtIdaKey, vtVoltaKey){
+    var rows='';
+    funcs.forEach(function(f){
+      var presenciais = f.diasPresenciais||[];
+      var vtIda = parseFloat(f[vtIdaKey])||0;
+      var vtVolta = parseFloat(f[vtVoltaKey])||0;
+
+      // Dias presenciais bruto
+      var diasVTBruto = diasDoMes.filter(function(d){
+        return d.isUtil && presenciais.indexOf(d.jsDay)>=0;
+      }).length;
+
+      // Férias
+      var ferias = calcularDiasFerias(f.id, mesRef, anoRef, diasDoMes, presenciais);
+
+      // Afastamento VT do cartão (chave separada dos afastamentos do Ifood)
+      var afasCartKey = f.id+'_cart_vt_'+tipoCartao+'_'+mesRef+'_'+anoRef;
+      var afasVT = parseInt(saldos[afasCartKey])||0;
+
+      var diasVT = Math.max(0, diasVTBruto - ferias.diasFeriasVT - afasVT);
+      var custoVT = diasVT * (vtIda + vtVolta);
+
+      // Saldo do cartão
+      var saldoKey = f.id+'_saldo_'+tipoCartao+'_'+mesRef+'_'+anoRef;
+      var saldo = parseFloat(saldos[saldoKey])||0;
+      var recarga = Math.max(0, custoVT - saldo);
+
+      _cartoesCalculo[f.id] = _cartoesCalculo[f.id]||{};
+      _cartoesCalculo[f.id][tipoCartao] = {
+        diasVTBruto:diasVTBruto, diasFeriasVT:ferias.diasFeriasVT,
+        afasVT:afasVT, diasVT:diasVT,
+        vtIda:vtIda, vtVolta:vtVolta, custoVT:custoVT,
+        saldo:saldo, recarga:recarga, mesRef:mesRef, anoRef:anoRef
+      };
+
+      var inputStyle='width:65px;padding:3px 5px;border:1px solid #d5daea;border-radius:6px;font-size:12px;text-align:center;';
+      rows+='<tr style="border-bottom:1px solid #e2e6f0;">'
+        +'<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+f.nome+'<br><span style="font-size:10px;color:#888;">'+f.cargo+'</span></td>'
+        +'<td style="text-align:center;font-size:12px;">'+diasVT+'<span style="color:#888;font-size:10px;"> /'+diasVTBruto+'</span></td>'
+        +'<td style="text-align:center;"><input type="number" min="0" value="'+afasVT+'" data-fid="'+f.id+'" data-tipo="cart_vt_'+tipoCartao+'" data-mes="'+mesRef+'" data-ano="'+anoRef+'" onchange="atualizarAfasCartao(this)" style="'+inputStyle+'"/></td>'
+        +'<td style="text-align:right;font-size:12px;">'+fmtMoeda(custoVT)+'</td>'
+        +'<td style="text-align:center;"><input type="number" step="0.01" min="0" value="'+saldo+'" data-fid="'+f.id+'" data-tipo="saldo_'+tipoCartao+'" data-mes="'+mesRef+'" data-ano="'+anoRef+'" onchange="atualizarSaldoCartao(this)" style="'+inputStyle+'"/></td>'
+        +'<td style="text-align:right;font-size:12px;font-weight:700;color:#11205b;">'+fmtMoeda(recarga)+'</td>'
+        +'</tr>';
+    });
+    return rows;
+  }
+
+  var rowsBhbus = buildRows(funcsBhbus,'bhbus','vtIdaBhbus','vtVoltaBhbus');
+  var rowsOtimo = buildRows(funcsOtimo,'otimo','vtIdaOtimo','vtVoltaOtimo');
+
+  document.getElementById('cartoes-bhbus-tbody').innerHTML = funcsBhbus.length>0
+    ? '<div style="font-size:11px;color:#888;padding:6px 12px;">Referência: '+labelMes+'</div><table style="width:100%;border-collapse:collapse;">'+thead+'<tbody>'+rowsBhbus+'</tbody></table>'
+    : '<p style="color:#888;font-size:13px;padding:12px;">Nenhum funcionário com Cartão BHBus.</p>';
+
+  document.getElementById('cartoes-otimo-tbody').innerHTML = funcsOtimo.length>0
+    ? '<div style="font-size:11px;color:#888;padding:6px 12px;">Referência: '+labelMes+'</div><table style="width:100%;border-collapse:collapse;">'+thead+'<tbody>'+rowsOtimo+'</tbody></table>'
+    : '<p style="color:#888;font-size:13px;padding:12px;">Nenhum funcionário com Cartão Ótimo.</p>';
+
+  document.getElementById('cartoes-resultado').style.display='block';
+}
+
+
+function atualizarAfasCartao(el){
+  var fid = el.dataset.fid;
+  var tipo = el.dataset.tipo;
+  var mes = parseInt(el.dataset.mes);
+  var ano = parseInt(el.dataset.ano);
+  var val = parseInt(el.value)||0;
+  var saldos = getSaldosCartoes();
+  saldos[fid+'_'+tipo+'_'+mes+'_'+ano] = val;
+  saveSaldosCartoes(saldos);
+  // Recalcular
+  calcularCartoes();
+}
+
+function atualizarSaldoCartao(el){
+  var fid = el.dataset.fid;
+  var tipo = el.dataset.tipo;
+  var dataKey = el.dataset.data;
+  var saldo = parseFloat(el.value)||0;
+  var saldos = getSaldosCartoes();
+  saldos[fid+'_'+tipo+'_'+dataKey] = saldo;
+  saveSaldosCartoes(saldos);
+  // Recalcular linha
+  if(_cartoesCalculo[fid]&&_cartoesCalculo[fid][tipo]){
+    var c = _cartoesCalculo[fid][tipo];
+    c.saldo = saldo;
+    c.recarga = Math.max(0, c.custoTotal - saldo);
+    // Atualizar célula de recarga na mesma linha
+    var td = el.parentElement.nextElementSibling;
+    if(td) td.textContent = fmtMoeda(c.recarga);
+  }
+}
+
+function lancarCartoesVTVR(){
+  if(!_cartoesDataCompra||Object.keys(_cartoesCalculo).length===0){toast('Calcule primeiro.');return;}
+  var partes = _cartoesDataCompra.split('-');
+  var mes = parseInt(partes[1]);
+  var ano = parseInt(partes[0]);
+  var criados = 0;
+
+  Object.keys(_cartoesCalculo).forEach(function(fid){
+    var f = funcionarios.find(function(x){return x.id===fid;})||{};
+    var calc = _cartoesCalculo[fid];
+    var totalBhbus = (calc.bhbus&&calc.bhbus.recarga>0) ? calc.bhbus.recarga : 0;
+    var totalOtimo = (calc.otimo&&calc.otimo.recarga>0) ? calc.otimo.recarga : 0;
+    if(totalBhbus===0&&totalOtimo===0) return;
+
+    // Remover lançamento anterior de cartão do mesmo func/mes/ano
+    lancamentos = lancamentos.filter(function(l){
+      return !(l.funcId===fid&&l.mes===mes&&l.ano===ano&&l.obs==='Cartoes BHBus/Otimo - recarga automatica');
+    });
+    try{supa.from('lancamentos').delete().eq('funcId',fid).then(function(){});}catch(e){}
+
+    var dadosLanc = {};
+    CAMPOS.forEach(function(campo){dadosLanc[campo.id]=0;});
+    dadosLanc['l-vt'] = Math.round((totalBhbus+totalOtimo)*100)/100;
+    var total = dadosLanc['l-vt'];
+    lancamentos.push({
+      id:'l_cartoes_'+fid+'_'+mes+'_'+ano,
+      funcId:fid, funcNome:f.nome||'',
+      mes:mes, ano:ano,
+      dados:dadosLanc,
+      obs:'Cartoes BHBus/Otimo - recarga automatica',
+      obsExtras:'BHBus: '+fmtMoeda(totalBhbus)+' | Otimo: '+fmtMoeda(totalOtimo),
+      total:total, createdAt:new Date().toISOString()
+    });
+    criados++;
+  });
+
+  // Salvar histórico de cartões
+  var hist = getHistoricoCartoes();
+  var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var snapshot = {
+    dataCompra:_cartoesDataCompra,
+    mes:mes, ano:ano,
+    label:meses[mes]+'/'+ano+' (compra '+_cartoesDataCompra.split('-').reverse().join('/')+')',
+    lancadoEm:new Date().toISOString(),
+    dados:JSON.parse(JSON.stringify(_cartoesCalculo))
+  };
+  var existeIdx = hist.findIndex(function(h){return h.dataCompra===_cartoesDataCompra;});
+  if(existeIdx>=0) hist[existeIdx]=snapshot; else hist.unshift(snapshot);
+  saveHistoricoCartoes(hist);
+  save();
+  renderHistoricoCartoes();
+  toast('Recargas lancadas! '+criados+' funcionario(s).');
+}
+
+async function excluirLancamentoCartoes(dataCompra, mesRef, anoRef){
+  if(!confirm('Excluir lancamento de cartoes de '+mesRef+'/'+anoRef+'?')) return;
+  var mes = parseInt(mesRef);
+  var ano = parseInt(anoRef);
+  var idsRemover = [];
+  lancamentos.forEach(function(l){
+    if(l.mes===mes&&l.ano===ano&&l.obs==='Cartoes BHBus/Otimo - recarga automatica') idsRemover.push(l.id);
+  });
+  // Deletar do Supabase PRIMEIRO (aguardar)
+  for(var i=0;i<idsRemover.length;i++){
+    try{await supa.from('lancamentos').delete().eq('id',idsRemover[i]);}catch(e){console.warn(e);}
+  }
+  // Depois remover do array local e salvar
+  lancamentos = lancamentos.filter(function(l){
+    return !(l.mes===mes&&l.ano===ano&&l.obs==='Cartoes BHBus/Otimo - recarga automatica');
+  });
+  var hist = getHistoricoCartoes().filter(function(h){return !(h.dataCompra===dataCompra&&h.mes===mes&&h.ano===ano);});
+  saveHistoricoCartoes(hist);
+  save();
+  renderHistoricoCartoes();
+  toast('Lancamento excluido!');
+}
+
+function editarLancamentoCartoes(dataCompra){
+  document.getElementById('cartoes-data-compra').value = dataCompra;
+  sidebarGoTo('vt-vr', document.querySelector('[data-page="vt-vr"]'));
+  calcularCartoes();
+  toast('Ajuste os saldos e lance novamente para atualizar.');
+}
+
+function renderHistoricoCartoes(){
+  var el = document.getElementById('cartoes-historico');
+  if(!el) return;
+  var hist = getHistoricoCartoes();
+  if(!hist.length){el.innerHTML='<p style="color:#888;font-size:13px;">Nenhuma recarga lancada ainda.</p>';return;}
+  el.innerHTML = hist.map(function(h){
+    var tTotal = 0;
+    Object.values(h.dados).forEach(function(d){
+      if(d.bhbus) tTotal+=d.bhbus.recarga||0;
+      if(d.otimo) tTotal+=d.otimo.recarga||0;
+    });
+    return '<div style="background:#fff;border:1px solid #e2e6f0;border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'
+      +'<div><div style="font-size:13px;font-weight:700;color:#11205b;">'+h.label+'</div>'
+      +'<div style="font-size:11px;color:#888;">Lancado em '+new Date(h.lancadoEm).toLocaleDateString('pt-BR')+'</div></div>'
+      +'<div style="display:flex;gap:8px;align-items:center;">'
+      +'<span style="font-size:12px;">Total: <strong>'+fmtMoeda(tTotal)+'</strong></span>'
+      +'<button onclick="editarLancamentoCartoes(\''+h.dataCompra+'\')" style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#92400e;">Editar</button>'
+      +'<button onclick="excluirLancamentoCartoes(\''+h.dataCompra+'\')" style="background:#fee2e2;border:1px solid #dc2626;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#dc2626;">Excluir</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+async function carregarCartoesDoSupabase(){
+  try{
+    var res=await supa.from('configuracoes').select('chave,valor').in('chave',['historico_cartoes','saldos_cartoes']);
+    if(res.data){res.data.forEach(function(r){
+      if(r.chave==='historico_cartoes') localStorage.setItem('rt_historico_cartoes',JSON.stringify(r.valor));
+      if(r.chave==='saldos_cartoes') localStorage.setItem('rt_saldos_cartoes',JSON.stringify(r.valor));
+    });}
+    renderHistoricoCartoes();
+  }catch(e){console.warn('Cartoes load error:',e);}
+}
+
 try{initSelects();}catch(e){console.warn(e);}
 try{populateDeptoSelect();}catch(e){console.warn(e);}
 try{renderFuncionarios();}catch(e){console.warn(e);}
@@ -6809,6 +7120,7 @@ setTimeout(function(){
       setTimeout(function(){iniciarRealtime();}, 2000);
       setTimeout(function(){carregarChecklistDoSupabase();}, 1000);
       setTimeout(function(){carregarVTVRDoSupabase();}, 1500);
+      setTimeout(function(){carregarCartoesDoSupabase();}, 2000);
     }
   });
 }, 500);
@@ -7062,6 +7374,52 @@ setTimeout(function(){
   <div style="margin-top:24px;">
     <div style="font-size:14px;font-weight:700;color:#11205b;margin-bottom:10px;">📋 Histórico de Meses Fechados</div>
     <div id="vtvr-historico"><p style="color:#888;font-size:13px;">Nenhum mês fechado ainda.</p></div>
+  </div>
+
+  <!-- Seção Cartões BHBus e Ótimo -->
+  <div style="margin-top:32px;padding-top:24px;border-top:2px solid #e2e6f0;">
+    <div style="font-size:16px;font-weight:700;color:#11205b;margin-bottom:4px;">🚌 Recarga Cartões BHBus e Ótimo</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px;">Calcula o valor de recarga considerando dias restantes do mês a partir da data da compra</div>
+    <div class="filter-bar" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;font-weight:600;color:#11205b;">Mês de referência:</label>
+        <select id="cartoes-mes-ref" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
+          <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+          <option value="3">Março</option><option value="4">Abril</option>
+          <option value="5">Maio</option><option value="6">Junho</option>
+          <option value="7">Julho</option><option value="8">Agosto</option>
+          <option value="9">Setembro</option><option value="10">Outubro</option>
+          <option value="11">Novembro</option><option value="12">Dezembro</option>
+        </select>
+        <select id="cartoes-ano-ref" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
+          <option value="2025">2025</option>
+          <option value="2026" selected>2026</option>
+          <option value="2027">2027</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;font-weight:600;color:#11205b;">Data da compra:</label>
+        <input type="date" id="cartoes-data-compra" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"/>
+      </div>
+      <button class="btn btn-primary" onclick="calcularCartoes()" style="background:#11205b;">🔄 Calcular Recarga</button>
+    </div>
+    <div id="cartoes-resultado" style="display:none;">
+      <div style="font-size:13px;font-weight:700;color:#11205b;margin-bottom:8px;">🚌 BHBus</div>
+      <div class="table-wrap" style="background:#fff;border-radius:10px;border:1px solid #e2e6f0;margin-bottom:16px;">
+        <div id="cartoes-bhbus-tbody"></div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:#11205b;margin-bottom:8px;">🟢 Ótimo</div>
+      <div class="table-wrap" style="background:#fff;border-radius:10px;border:1px solid #e2e6f0;margin-bottom:16px;">
+        <div id="cartoes-otimo-tbody"></div>
+      </div>
+      <div style="text-align:right;">
+        <button class="btn btn-orange" onclick="lancarCartoesVTVR()">✅ Lançar Recargas</button>
+      </div>
+    </div>
+    <div style="margin-top:20px;">
+      <div style="font-size:13px;font-weight:700;color:#11205b;margin-bottom:10px;">📋 Histórico de Recargas</div>
+      <div id="cartoes-historico"><p style="color:#888;font-size:13px;">Nenhuma recarga lançada ainda.</p></div>
+    </div>
   </div>
 </div>
 
