@@ -2094,7 +2094,9 @@ function removeLanc(id){
   lancamentos=lancamentos.filter(l=>l.id!==id);
   save();
   // Deletar também no Supabase
-  try{supa.from('lancamentos').delete().eq('id',id).then(function(){console.log('Lançamento deletado do Supabase');});}catch(e){console.warn(e);}
+  try{supa.rpc('delete_lancamento',{p_id:id}).then(function(){}).catch(function(){
+    supa.from('lancamentos').delete().filter('dados->>id','eq',id).then(function(){console.log('Lancamento deletado do Supabase');});
+  });}catch(e){console.warn(e);}
   renderRelatorio();
   toast('Removido.');
 }
@@ -6791,10 +6793,14 @@ async function excluirMesVTVR(mes, ano){
   });
   // 3. Salvar localStorage (sem syncToSupabase)
   localStorage.setItem('rt_lancs', JSON.stringify(lancamentos));
-  // 4. Deletar do Supabase DEPOIS do save local
-  for(var i=0;i<idsRemover.length;i++){
-    try{await supa.from('lancamentos').delete().eq('id',idsRemover[i]);}catch(e){console.warn(e);}
-  }
+  // 4. Deletar do Supabase pelo obs (mais confiável que por ID)
+  try{
+    await supa.from('lancamentos')
+      .delete()
+      .eq('dados->>mes', String(mes))
+      .eq('dados->>ano', String(ano))
+      .eq('dados->>obs', 'VT/VR gerado automaticamente');
+  }catch(e){console.warn('delete vtvr supabase:',e);}
   // 5. Remover do histórico
   var hist = getHistoricoVTVR().filter(function(h){return !(h.mes===mes&&h.ano===ano);});
   saveHistoricoVTVR(hist);
@@ -6867,8 +6873,15 @@ function calcularCartoes(){
   var mesRef = parseInt(document.getElementById('cartoes-mes-ref').value);
   var anoRef = parseInt(document.getElementById('cartoes-ano-ref').value);
 
-  var diasDoMes = getDiasDoMes(mesRef, anoRef);
-  var savedAfasCart = getSaldosCartoes(); // reutilizamos para afastamentos tb
+  // Mês atual (da data da compra)
+  var partesCompra = dataCompra.split('-');
+  var anoCompra = parseInt(partesCompra[0]);
+  var mesCompra = parseInt(partesCompra[1]);
+
+  var diasMesRef = getDiasDoMes(mesRef, anoRef);
+  var diasMesAtual = getDiasDoMes(mesCompra, anoCompra);
+  var diasUteisRef = diasMesRef.filter(function(d){return d.isUtil;}).length;
+  var savedAfasCart = getSaldosCartoes();
   var saldos = getSaldosCartoes();
 
   var funcsBhbus = funcionarios.filter(function(f){
@@ -6887,10 +6900,13 @@ function calcularCartoes(){
   var thR='padding:8px 12px;font-size:11px;text-align:right;';
   var thead='<thead><tr style="background:#11205b;color:#fff;">'
     +'<th style="'+thStyle+'">Funcionário</th>'
-    +'<th style="'+thC+'">Dias VT</th>'
+    +'<th style="'+thC+'">Dias VT (ref)</th>'
     +'<th style="'+thC+'">Afas. VT</th>'
-    +'<th style="'+thR+'">Custo VT</th>'
+    +'<th style="'+thR+'">Custo (ref)</th>'
+    +'<th style="'+thC+'">Dias rest. agora</th>'
+    +'<th style="'+thR+'">Uso rest. agora</th>'
     +'<th style="'+thC+'">Saldo Cartão</th>'
+    +'<th style="'+thR+'">Saldo p/ ref</th>'
     +'<th style="'+thR+'">Recarga</th>'
     +'</tr></thead>';
 
@@ -6901,41 +6917,48 @@ function calcularCartoes(){
       var vtIda = parseFloat(f[vtIdaKey])||0;
       var vtVolta = parseFloat(f[vtVoltaKey])||0;
 
-      // Dias presenciais bruto
-      var diasVTBruto = diasDoMes.filter(function(d){
+      // Dias VT no mês de referência
+      var diasVTBruto = diasMesRef.filter(function(d){
         return d.isUtil && presenciais.indexOf(d.jsDay)>=0;
       }).length;
-
-      // Férias
-      var ferias = calcularDiasFerias(f.id, mesRef, anoRef, diasDoMes, presenciais);
-
-      // Afastamento VT do cartão (chave separada dos afastamentos do Ifood)
+      var ferias = calcularDiasFerias(f.id, mesRef, anoRef, diasMesRef, presenciais);
       var afasCartKey = f.id+'_cart_vt_'+tipoCartao+'_'+mesRef+'_'+anoRef;
       var afasVT = parseInt(saldos[afasCartKey])||0;
-
       var diasVT = Math.max(0, diasVTBruto - ferias.diasFeriasVT - afasVT);
       var custoVT = diasVT * (vtIda + vtVolta);
 
-      // Saldo do cartão
+      // Dias presenciais restantes no mês atual (após data da compra) + 1 segurança
+      var diasRestantesAtual = diasMesAtual.filter(function(d){
+        return d.date > dataCompra && d.isUtil && presenciais.indexOf(d.jsDay)>=0;
+      }).length + 1;
+      var usoRestanteAtual = diasRestantesAtual * (vtIda + vtVolta);
+
+      // Saldo disponível para o mês de referência
       var saldoKey = f.id+'_saldo_'+tipoCartao+'_'+mesRef+'_'+anoRef;
-      var saldo = parseFloat(saldos[saldoKey])||0;
-      var recarga = Math.max(0, custoVT - saldo);
+      var saldoAtual = parseFloat(saldos[saldoKey])||0;
+      var saldoDisponivel = Math.max(0, saldoAtual - usoRestanteAtual);
+      var recarga = Math.max(0, custoVT - saldoDisponivel);
 
       _cartoesCalculo[f.id] = _cartoesCalculo[f.id]||{};
       _cartoesCalculo[f.id][tipoCartao] = {
         diasVTBruto:diasVTBruto, diasFeriasVT:ferias.diasFeriasVT,
         afasVT:afasVT, diasVT:diasVT,
         vtIda:vtIda, vtVolta:vtVolta, custoVT:custoVT,
-        saldo:saldo, recarga:recarga, mesRef:mesRef, anoRef:anoRef
+        diasRestantesAtual:diasRestantesAtual, usoRestanteAtual:usoRestanteAtual,
+        saldo:saldoAtual, saldoDisponivel:saldoDisponivel, recarga:recarga,
+        mesRef:mesRef, anoRef:anoRef
       };
 
-      var inputStyle='width:65px;padding:3px 5px;border:1px solid #d5daea;border-radius:6px;font-size:12px;text-align:center;';
+      var inputStyle='width:70px;padding:3px 5px;border:1px solid #d5daea;border-radius:6px;font-size:12px;text-align:center;';
       rows+='<tr style="border-bottom:1px solid #e2e6f0;">'
         +'<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+f.nome+'<br><span style="font-size:10px;color:#888;">'+f.cargo+'</span></td>'
         +'<td style="text-align:center;font-size:12px;">'+diasVT+'<span style="color:#888;font-size:10px;"> /'+diasVTBruto+'</span></td>'
         +'<td style="text-align:center;"><input type="number" min="0" value="'+afasVT+'" data-fid="'+f.id+'" data-tipo="cart_vt_'+tipoCartao+'" data-mes="'+mesRef+'" data-ano="'+anoRef+'" onchange="atualizarAfasCartao(this)" style="'+inputStyle+'"/></td>'
         +'<td style="text-align:right;font-size:12px;">'+fmtMoeda(custoVT)+'</td>'
-        +'<td style="text-align:center;"><input type="number" step="0.01" min="0" value="'+saldo+'" data-fid="'+f.id+'" data-tipo="saldo_'+tipoCartao+'" data-mes="'+mesRef+'" data-ano="'+anoRef+'" onchange="atualizarSaldoCartao(this)" style="'+inputStyle+'"/></td>'
+        +'<td style="text-align:center;font-size:12px;color:#f94603;">'+diasRestantesAtual+'</td>'
+        +'<td style="text-align:right;font-size:12px;color:#f94603;">'+fmtMoeda(usoRestanteAtual)+'</td>'
+        +'<td style="text-align:center;"><input type="number" step="0.01" min="0" value="'+saldoAtual+'" data-fid="'+f.id+'" data-tipo="saldo_'+tipoCartao+'" data-mes="'+mesRef+'" data-ano="'+anoRef+'" onchange="atualizarSaldoCartao(this)" style="'+inputStyle+'"/></td>'
+        +'<td style="text-align:right;font-size:12px;color:#16a34a;font-weight:600;">'+fmtMoeda(saldoDisponivel)+'</td>'
         +'<td style="text-align:right;font-size:12px;font-weight:700;color:#11205b;">'+fmtMoeda(recarga)+'</td>'
         +'</tr>';
     });
@@ -6946,11 +6969,11 @@ function calcularCartoes(){
   var rowsOtimo = buildRows(funcsOtimo,'otimo','vtIdaOtimo','vtVoltaOtimo');
 
   document.getElementById('cartoes-bhbus-tbody').innerHTML = funcsBhbus.length>0
-    ? '<div style="font-size:11px;color:#888;padding:6px 12px;">Referência: '+labelMes+'</div><table style="width:100%;border-collapse:collapse;">'+thead+'<tbody>'+rowsBhbus+'</tbody></table>'
+    ? '<div style="font-size:11px;color:#888;padding:6px 12px;">Referência: '+labelMes+' | Compra: '+dataCompra.split('-').reverse().join('/')+'</div><table style="width:100%;border-collapse:collapse;">'+thead+'<tbody>'+rowsBhbus+'</tbody></table>'
     : '<p style="color:#888;font-size:13px;padding:12px;">Nenhum funcionário com Cartão BHBus.</p>';
 
   document.getElementById('cartoes-otimo-tbody').innerHTML = funcsOtimo.length>0
-    ? '<div style="font-size:11px;color:#888;padding:6px 12px;">Referência: '+labelMes+'</div><table style="width:100%;border-collapse:collapse;">'+thead+'<tbody>'+rowsOtimo+'</tbody></table>'
+    ? '<div style="font-size:11px;color:#888;padding:6px 12px;">Referência: '+labelMes+' | Compra: '+dataCompra.split('-').reverse().join('/')+'</div><table style="width:100%;border-collapse:collapse;">'+thead+'<tbody>'+rowsOtimo+'</tbody></table>'
     : '<p style="color:#888;font-size:13px;padding:12px;">Nenhum funcionário com Cartão Ótimo.</p>';
 
   document.getElementById('cartoes-resultado').style.display='block';
@@ -6972,20 +6995,24 @@ function atualizarAfasCartao(el){
 
 function atualizarSaldoCartao(el){
   var fid = el.dataset.fid;
-  var tipo = el.dataset.tipo;
-  var dataKey = el.dataset.data;
+  var tipoCompleto = el.dataset.tipo;
+  var tipoCartao = tipoCompleto.replace('saldo_','');
+  var mes = el.dataset.mes;
+  var ano = el.dataset.ano;
   var saldo = parseFloat(el.value)||0;
   var saldos = getSaldosCartoes();
-  saldos[fid+'_'+tipo+'_'+dataKey] = saldo;
+  saldos[fid+'_saldo_'+tipoCartao+'_'+mes+'_'+ano] = saldo;
   saveSaldosCartoes(saldos);
-  // Recalcular linha
-  if(_cartoesCalculo[fid]&&_cartoesCalculo[fid][tipo]){
-    var c = _cartoesCalculo[fid][tipo];
+  if(_cartoesCalculo[fid]&&_cartoesCalculo[fid][tipoCartao]){
+    var c = _cartoesCalculo[fid][tipoCartao];
     c.saldo = saldo;
-    c.recarga = Math.max(0, c.custoTotal - saldo);
-    // Atualizar célula de recarga na mesma linha
-    var td = el.parentElement.nextElementSibling;
-    if(td) td.textContent = fmtMoeda(c.recarga);
+    c.saldoDisponivel = Math.max(0, saldo - (c.usoRestanteAtual||0));
+    c.recarga = Math.max(0, c.custoVT - c.saldoDisponivel);
+    // Atualizar saldoDisponivel e recarga na linha
+    var tdSaldoDisp = el.parentElement.nextElementSibling;
+    if(tdSaldoDisp) tdSaldoDisp.textContent = fmtMoeda(c.saldoDisponivel);
+    var tdRecarga = tdSaldoDisp ? tdSaldoDisp.nextElementSibling : null;
+    if(tdRecarga) tdRecarga.textContent = fmtMoeda(c.recarga);
   }
 }
 
@@ -7058,10 +7085,14 @@ async function excluirLancamentoCartoes(dataCompra, mesRef, anoRef){
   });
   // 3. Salvar localStorage (sem syncToSupabase)
   localStorage.setItem('rt_lancs', JSON.stringify(lancamentos));
-  // 4. Deletar do Supabase DEPOIS do save local
-  for(var i=0;i<idsRemover.length;i++){
-    try{await supa.from('lancamentos').delete().eq('id',idsRemover[i]);}catch(e){console.warn(e);}
-  }
+  // 4. Deletar do Supabase pelo obs (mais confiável que por ID)
+  try{
+    await supa.from('lancamentos')
+      .delete()
+      .eq('dados->>mes', String(mes))
+      .eq('dados->>ano', String(ano))
+      .eq('dados->>obs', 'Cartoes BHBus/Otimo - recarga automatica');
+  }catch(e){console.warn('delete cartoes supabase:',e);}
   // 5. Remover do histórico
   var hist = getHistoricoCartoes().filter(function(h){return !(h.dataCompra===dataCompra&&h.mes===mes&&h.ano===ano);});
   saveHistoricoCartoes(hist);
