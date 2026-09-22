@@ -2090,16 +2090,16 @@ function renderRelatorio(){
   tbody.innerHTML=rows;
 }
 async function deletarDoSupabase(ids){
-  // Deleta do Supabase e depois faz upsert dos restantes para garantir consistência
-  for(var i=0;i<ids.length;i++){
-    try{await supa.from('lancamentos').delete().eq('id',ids[i]);}catch(e){console.warn(e);}
-  }
-  // Re-sincronizar lançamentos restantes
   try{
-    var lancsData = lancamentos.map(function(l){return {id:l.id, dados:l};});
-    if(lancsData.length) await supa.from('lancamentos').upsert(lancsData);
-    else await supa.from('lancamentos').delete().neq('id','__none__');
-  }catch(e){console.warn(e);}
+    // 1. Apagar TODOS os lançamentos do Supabase
+    await supa.from('lancamentos').delete().neq('id','__placeholder__');
+    // 2. Re-inserir apenas os que restaram no array local
+    if(lancamentos.length > 0){
+      var lancsData = lancamentos.map(function(l){return {id:l.id, dados:l};});
+      await supa.from('lancamentos').insert(lancsData);
+    }
+    console.log('✅ Supabase sincronizado após delete');
+  }catch(e){console.warn('deletarDoSupabase erro:',e);}
 }
 
 async function removeLanc(id){
