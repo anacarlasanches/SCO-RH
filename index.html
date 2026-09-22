@@ -7018,9 +7018,11 @@ function atualizarSaldoCartao(el){
 
 function lancarCartoesVTVR(){
   if(!_cartoesDataCompra||Object.keys(_cartoesCalculo).length===0){toast('Calcule primeiro.');return;}
-  var partes = _cartoesDataCompra.split('-');
-  var mes = parseInt(partes[1]);
-  var ano = parseInt(partes[0]);
+  var mesRef = parseInt(document.getElementById('cartoes-mes-ref').value);
+  var anoRef = parseInt(document.getElementById('cartoes-ano-ref').value);
+  // Lançamento no mês ANTERIOR ao de referência (mês da compra)
+  var mes = mesRef === 1 ? 12 : mesRef - 1;
+  var ano = mesRef === 1 ? anoRef - 1 : anoRef;
   var criados = 0;
 
   Object.keys(_cartoesCalculo).forEach(function(fid){
@@ -7067,6 +7069,7 @@ function lancarCartoesVTVR(){
   saveHistoricoCartoes(hist);
   save();
   renderHistoricoCartoes();
+  try{renderRelatorio();}catch(e){}
   toast('Recargas lancadas! '+criados+' funcionario(s).');
 }
 
