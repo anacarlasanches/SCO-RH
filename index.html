@@ -6689,18 +6689,15 @@ function criarLancamentoVTVR(c){
   var mesLanc = _vtvrMesAtual===1 ? 12 : _vtvrMesAtual-1;
   var anoLanc = _vtvrMesAtual===1 ? _vtvrAnoAtual-1 : _vtvrAnoAtual;
 
-  // Verificar se já existe lançamento de cartão BHBus/Ótimo para esse func/mes
-  var lancCartao = lancamentos.find(function(l){
-    return l.funcId===c.funcId && l.mes===mesLanc && l.ano===anoLanc
-      && l.obs==='Cartoes BHBus/Otimo - recarga automatica';
+  // Verificar se já existe QUALQUER lançamento para esse func/mes/ano e mesclar
+  var lancExiste = lancamentos.find(function(l){
+    return l.funcId===c.funcId && l.mes===mesLanc && l.ano===anoLanc;
   });
 
-  if(lancCartao){
-    // Mesclar: adicionar VR ao lançamento de cartão existente
-    lancCartao.dados['l-vr'] = Math.round((c.totalVR||0)*100)/100;
-    lancCartao.total = Object.values(lancCartao.dados).reduce(function(a,b){return a+(b||0);},0);
-    lancCartao.obs = 'VT/VR gerado automaticamente';
-    lancCartao.obsExtras = (lancCartao.obsExtras||'') + ' | VR: '+fmtMoeda(c.totalVR||0);
+  if(lancExiste){
+    lancExiste.dados['l-vt'] = Math.round(((lancExiste.dados['l-vt']||0)+(c.totalVT||0))*100)/100;
+    lancExiste.dados['l-vr'] = Math.round(((lancExiste.dados['l-vr']||0)+(c.totalVR||0))*100)/100;
+    lancExiste.total = Object.values(lancExiste.dados).reduce(function(a,b){return a+(b||0);},0);
     return true;
   }
 
