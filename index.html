@@ -2089,14 +2089,24 @@ function renderRelatorio(){
   }
   tbody.innerHTML=rows;
 }
-function removeLanc(id){
+async function deletarDoSupabase(ids){
+  // Deleta do Supabase e depois faz upsert dos restantes para garantir consistência
+  for(var i=0;i<ids.length;i++){
+    try{await supa.from('lancamentos').delete().eq('id',ids[i]);}catch(e){console.warn(e);}
+  }
+  // Re-sincronizar lançamentos restantes
+  try{
+    var lancsData = lancamentos.map(function(l){return {id:l.id, dados:l};});
+    if(lancsData.length) await supa.from('lancamentos').upsert(lancsData);
+    else await supa.from('lancamentos').delete().neq('id','__none__');
+  }catch(e){console.warn(e);}
+}
+
+async function removeLanc(id){
   if(!confirm('Remover?'))return;
   lancamentos=lancamentos.filter(l=>l.id!==id);
-  save();
-  // Deletar também no Supabase
-  try{supa.rpc('delete_lancamento',{p_id:id}).then(function(){}).catch(function(){
-    supa.from('lancamentos').delete().filter('dados->>id','eq',id).then(function(){console.log('Lancamento deletado do Supabase');});
-  });}catch(e){console.warn(e);}
+  localStorage.setItem('rt_lancs',JSON.stringify(lancamentos));
+  await deletarDoSupabase([id]);
   renderRelatorio();
   toast('Removido.');
 }
@@ -6808,26 +6818,15 @@ function exportarVTVRPDF(){
 async function excluirMesVTVR(mes, ano){
   var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   if(!confirm('Excluir fechamento de '+meses[mes]+'/'+ano+'?\nIsso vai remover os lancamentos VT/VR desse mes da aba Lancamentos.')) return;
-  // 1. Encontrar IDs a remover
   var idsRemover = [];
   lancamentos.forEach(function(l){
     if(l.mes===mes&&l.ano===ano&&l.obs==='VT/VR gerado automaticamente') idsRemover.push(l.id);
   });
-  // 2. Remover do array local
   lancamentos = lancamentos.filter(function(l){
     return !(l.mes===mes&&l.ano===ano&&l.obs==='VT/VR gerado automaticamente');
   });
-  // 3. Salvar localStorage (sem syncToSupabase)
   localStorage.setItem('rt_lancs', JSON.stringify(lancamentos));
-  // 4. Deletar do Supabase pelo obs (mais confiável que por ID)
-  try{
-    await supa.from('lancamentos')
-      .delete()
-      .eq('dados->>mes', String(mes))
-      .eq('dados->>ano', String(ano))
-      .eq('dados->>obs', 'VT/VR gerado automaticamente');
-  }catch(e){console.warn('delete vtvr supabase:',e);}
-  // 5. Remover do histórico
+  await deletarDoSupabase(idsRemover);
   var hist = getHistoricoVTVR().filter(function(h){return !(h.mes===mes&&h.ano===ano);});
   saveHistoricoVTVR(hist);
   renderHistoricoVTVR();
@@ -7109,26 +7108,15 @@ async function excluirLancamentoCartoes(dataCompra, mesRef, anoRef){
   if(!confirm('Excluir lancamento de cartoes de '+mesRef+'/'+anoRef+'?')) return;
   var mes = parseInt(mesRef);
   var ano = parseInt(anoRef);
-  // 1. Encontrar IDs a remover
   var idsRemover = [];
   lancamentos.forEach(function(l){
     if(l.mes===mes&&l.ano===ano&&l.obs==='Cartoes BHBus/Otimo - recarga automatica') idsRemover.push(l.id);
   });
-  // 2. Remover do array local
   lancamentos = lancamentos.filter(function(l){
     return !(l.mes===mes&&l.ano===ano&&l.obs==='Cartoes BHBus/Otimo - recarga automatica');
   });
-  // 3. Salvar localStorage (sem syncToSupabase)
   localStorage.setItem('rt_lancs', JSON.stringify(lancamentos));
-  // 4. Deletar do Supabase pelo obs (mais confiável que por ID)
-  try{
-    await supa.from('lancamentos')
-      .delete()
-      .eq('dados->>mes', String(mes))
-      .eq('dados->>ano', String(ano))
-      .eq('dados->>obs', 'Cartoes BHBus/Otimo - recarga automatica');
-  }catch(e){console.warn('delete cartoes supabase:',e);}
-  // 5. Remover do histórico
+  await deletarDoSupabase(idsRemover);
   var hist = getHistoricoCartoes().filter(function(h){return !(h.dataCompra===dataCompra&&h.mes===mes&&h.ano===ano);});
   saveHistoricoCartoes(hist);
   renderHistoricoCartoes();
