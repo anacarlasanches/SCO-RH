@@ -15,7 +15,13 @@ jobs:
           node-version: '20'
       - name: Install Wrangler
         run: npm install -g wrangler
+      - name: Create wrangler.toml
+        run: |
+          echo 'name = "sco-rh"' > wrangler.toml
+          echo 'compatibility_date = "2024-01-01"' >> wrangler.toml
+          echo '[assets]' >> wrangler.toml
+          echo 'directory = "."' >> wrangler.toml
       - name: Deploy
-        run: wrangler pages deploy . --project-name sco-rh
+        run: wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
