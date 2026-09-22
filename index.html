@@ -5741,7 +5741,21 @@ async function syncToSupabase(){
     const funcsData = funcionarios.map(f => ({id: f.id, dados: f}));
     if(funcsData.length) await supa.from('funcionarios').upsert(funcsData);
     
-    // Salvar lancamentos
+    // Salvar lancamentos - primeiro deletar os que não existem mais, depois upsert
+    const lancsIds = lancamentos.map(l => l.id);
+    if(lancsIds.length > 0){
+      // Deletar do Supabase qualquer lançamento que não está no array local
+      const {data: lancsSupabase} = await supa.from('lancamentos').select('id');
+      if(lancsSupabase){
+        const idsParaDeletar = lancsSupabase.map(r=>r.id).filter(id=>!lancsIds.includes(id));
+        for(const id of idsParaDeletar){
+          await supa.from('lancamentos').delete().eq('id', id);
+        }
+      }
+    } else {
+      // Array vazio - deletar tudo do Supabase
+      await supa.from('lancamentos').delete().neq('id','__placeholder__');
+    }
     const lancsData = lancamentos.map(l => ({id: l.id, dados: l}));
     if(lancsData.length) await supa.from('lancamentos').upsert(lancsData);
     
