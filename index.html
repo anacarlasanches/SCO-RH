@@ -7048,17 +7048,8 @@ function atualizarSaldoCartao(el){
   var saldos = getSaldosCartoes();
   saldos[fid+'_saldo_'+tipoCartao+'_'+mes+'_'+ano] = saldo;
   saveSaldosCartoes(saldos);
-  if(_cartoesCalculo[fid]&&_cartoesCalculo[fid][tipoCartao]){
-    var c = _cartoesCalculo[fid][tipoCartao];
-    c.saldo = saldo;
-    c.saldoDisponivel = Math.max(0, saldo - (c.usoRestanteAtual||0));
-    c.recarga = Math.max(0, c.custoVT - c.saldoDisponivel);
-    // Atualizar saldoDisponivel e recarga na linha
-    var tdSaldoDisp = el.parentElement.nextElementSibling;
-    if(tdSaldoDisp) tdSaldoDisp.textContent = fmtMoeda(c.saldoDisponivel);
-    var tdRecarga = tdSaldoDisp ? tdSaldoDisp.nextElementSibling : null;
-    if(tdRecarga) tdRecarga.textContent = fmtMoeda(c.recarga);
-  }
+  // Recalcular a tabela inteira para garantir atualização correta
+  calcularCartoes();
 }
 
 function lancarCartoesVTVR(){
