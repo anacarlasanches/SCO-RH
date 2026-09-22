@@ -6406,7 +6406,13 @@ function getHistoricoVTVR(){
 }
 function saveHistoricoVTVR(arr){
   localStorage.setItem('rt_historico_vtvr',JSON.stringify(arr));
-  try{supa.from('configuracoes').upsert([{chave:'historico_vtvr',valor:arr}]).then(function(){});}catch(e){}
+  try{
+    if(arr.length===0){
+      supa.from('configuracoes').delete().eq('chave','historico_vtvr').then(function(){});
+    } else {
+      supa.from('configuracoes').upsert([{chave:'historico_vtvr',valor:arr}]).then(function(){});
+    }
+  }catch(e){}
 }
 
 var _vtvrCalculo = {};
@@ -6606,8 +6612,10 @@ function fecharMesVTVR(){
     toast('Calcule o mês primeiro.');return;
   }
   // Limpar lançamentos VT/VR zerados anteriores deste mês
+  var _mesLancFech = _vtvrMesAtual===1?12:_vtvrMesAtual-1;
+  var _anoLancFech = _vtvrMesAtual===1?_vtvrAnoAtual-1:_vtvrAnoAtual;
   lancamentos = lancamentos.filter(function(l){
-    if(l.mes!==_vtvrMesAtual||l.ano!==_vtvrAnoAtual) return true;
+    if(l.mes!==_mesLancFech||l.ano!==_anoLancFech) return true;
     if(l.obs==='VT/VR gerado automaticamente'&&l.total===0) return false;
     return true;
   });
@@ -6617,13 +6625,15 @@ function fecharMesVTVR(){
   Object.values(_vtvrCalculo).forEach(function(c){
     if((c.totalVT||0)===0&&(c.totalVR||0)===0) return; // ignorar zerados
     // Verificar qualquer lançamento VT/VR já existente para esse func/mes/ano
+    var _mesLancDup = _vtvrMesAtual===1?12:_vtvrMesAtual-1;
+    var _anoLancDup = _vtvrMesAtual===1?_vtvrAnoAtual-1:_vtvrAnoAtual;
     var existeVT = lancamentos.find(function(l){
-      return l.funcId===c.funcId && l.mes===_vtvrMesAtual && l.ano===_vtvrAnoAtual
-        && l.dados && (l.dados['l-vt']||0)>0;
+      return l.funcId===c.funcId && l.mes===_mesLancDup && l.ano===_anoLancDup
+        && l.dados && (l.dados['l-vt']||0)>0 && l.obs==='VT/VR gerado automaticamente';
     });
     var existeVR = lancamentos.find(function(l){
-      return l.funcId===c.funcId && l.mes===_vtvrMesAtual && l.ano===_vtvrAnoAtual
-        && l.dados && (l.dados['l-vr']||0)>0;
+      return l.funcId===c.funcId && l.mes===_mesLancDup && l.ano===_anoLancDup
+        && l.dados && (l.dados['l-vr']||0)>0 && l.obs==='VT/VR gerado automaticamente';
     });
     if(existeVT||existeVR){
       _vtvrDuplicataFila.push({calculo:c,existeVT:existeVT,existeVR:existeVR});
@@ -6675,15 +6685,34 @@ function criarLancamentoVTVR(c){
   // Só criar se tiver valor
   if((c.totalVT||0)===0 && (c.totalVR||0)===0) return false;
   var fNome=(funcionarios.find(function(f){return f.id===c.funcId;})||{}).nome||c.funcNome;
+  // Lançamento no mês ANTERIOR ao calculado (pagamento é feito antes)
+  var mesLanc = _vtvrMesAtual===1 ? 12 : _vtvrMesAtual-1;
+  var anoLanc = _vtvrMesAtual===1 ? _vtvrAnoAtual-1 : _vtvrAnoAtual;
+
+  // Verificar se já existe lançamento de cartão BHBus/Ótimo para esse func/mes
+  var lancCartao = lancamentos.find(function(l){
+    return l.funcId===c.funcId && l.mes===mesLanc && l.ano===anoLanc
+      && l.obs==='Cartoes BHBus/Otimo - recarga automatica';
+  });
+
+  if(lancCartao){
+    // Mesclar: adicionar VR ao lançamento de cartão existente
+    lancCartao.dados['l-vr'] = Math.round((c.totalVR||0)*100)/100;
+    lancCartao.total = Object.values(lancCartao.dados).reduce(function(a,b){return a+(b||0);},0);
+    lancCartao.obs = 'VT/VR gerado automaticamente';
+    lancCartao.obsExtras = (lancCartao.obsExtras||'') + ' | VR: '+fmtMoeda(c.totalVR||0);
+    return true;
+  }
+
   var dadosLanc={};
   CAMPOS.forEach(function(campo){dadosLanc[campo.id]=0;});
   dadosLanc['l-vt']=Math.round(c.totalVT*100)/100;
   dadosLanc['l-vr']=Math.round(c.totalVR*100)/100;
   var total=dadosLanc['l-vt']+dadosLanc['l-vr'];
   lancamentos.push({
-    id:'l_vtvr_'+c.funcId+'_'+_vtvrMesAtual+'_'+_vtvrAnoAtual,
+    id:'l_vtvr_'+c.funcId+'_'+mesLanc+'_'+anoLanc,
     funcId:c.funcId,funcNome:fNome,
-    mes:_vtvrMesAtual,ano:_vtvrAnoAtual,
+    mes:mesLanc,ano:anoLanc,
     dados:dadosLanc,obs:'VT/VR gerado automaticamente',obsExtras:'',
     total:total,createdAt:new Date().toISOString()
   });
@@ -6834,7 +6863,13 @@ function getHistoricoCartoes(){
 }
 function saveHistoricoCartoes(arr){
   localStorage.setItem('rt_historico_cartoes',JSON.stringify(arr));
-  try{supa.from('configuracoes').upsert([{chave:'historico_cartoes',valor:arr}]).then(function(){});}catch(e){}
+  try{
+    if(arr.length===0){
+      supa.from('configuracoes').delete().eq('chave','historico_cartoes').then(function(){});
+    } else {
+      supa.from('configuracoes').upsert([{chave:'historico_cartoes',valor:arr}]).then(function(){});
+    }
+  }catch(e){}
 }
 
 function getSaldosCartoes(){
