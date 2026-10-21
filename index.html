@@ -1233,12 +1233,13 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
     <div class="btn-actions"><button class="btn btn-orange" onclick="salvarMeta()">💾 Salvar meta</button></div>
   </div>
   <div class="filter-bar">
+    <select id="meta-filtro-depto" onchange="aplicarSetorMetas()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;border-color:var(--sco-azul);font-weight:600;"><option value="">🏢 Todos os setores</option></select>
     <select id="meta-filtro-func" onchange="renderMetasTabela()" style="min-width:200px;padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="">Todos os funcionários</option></select>
     <select id="meta-filtro-ano" onchange="renderMetasTabela()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option></select>
     <select id="meta-filtro-periodo" onchange="renderMetasTabela()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="anual">📅 Anual</option><option value="s1">1º Semestre</option><option value="s2">2º Semestre</option></select>
   </div>
   <div id="meta-indicadores" class="metrics-grid" style="margin-bottom:14px;"></div>
-  <div class="charts-row" style="margin-bottom:14px;">
+  <div style="margin-bottom:14px;">
     <div class="card">
       <div class="card-title"><span class="dot"></span>📈 Evolução de metas por colaborador</div>
       <div style="margin-bottom:8px;">
@@ -1247,21 +1248,6 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
         </select>
       </div>
       <div style="position:relative;height:200px;"><canvas id="chartMetaEvolucao"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="dot"></span>🏆 Ranking do mês</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <select id="meta-rank-mes" onchange="renderMetaRanking()" style="padding:6px 10px;border:1px solid #d5daea;border-radius:8px;font-size:12px;">
-          <option value="1">Jan</option><option value="2">Fev</option><option value="3">Mar</option>
-          <option value="4">Abr</option><option value="5">Mai</option><option value="6">Jun</option>
-          <option value="7">Jul</option><option value="8">Ago</option><option value="9">Set</option>
-          <option value="10">Out</option><option value="11">Nov</option><option value="12">Dez</option>
-        </select>
-        <select id="meta-rank-ano" onchange="renderMetaRanking()" style="padding:6px 10px;border:1px solid #d5daea;border-radius:8px;font-size:12px;">
-          <option value="2025">2025</option><option value="2026" selected>2026</option>
-        </select>
-      </div>
-      <div id="meta-ranking-lista"></div>
     </div>
   </div>
   <div class="card">
@@ -1899,7 +1885,7 @@ function verificarLancamentosExistentes(){
   }
   const existentes=lancamentos.filter(l=>l.funcId===funcId&&l.mes===mes&&l.ano===ano);
   const aviso=document.getElementById('aviso-lanc-existente');
-  if(existentes.length){aviso.style.display='block';aviso.innerHTML=`ℹ️ Este funcionário já tem <strong>${existentes.length} lançamento(s)</strong> em ${MESES[mes]}/${ano}. Salvar adicionará um novo.`;}
+  if(existentes.length){aviso.style.display='block';aviso.innerHTML=`ℹ️ Este funcionário já tem <strong>${existentes.length} lançamento(s)</strong> em ${MESES[mes]}/${ano}. Os valores serão <strong>somados</strong> ao lançamento existente.`;}
   else{aviso.style.display='none';}
 }
 
@@ -1951,8 +1937,19 @@ function salvarLancamento(){
     toast('Lançamento atualizado!');
   }else{
     const fNome=(funcionarios.find(f=>f.id===funcId)||{}).nome||'';
-    lancamentos.push({id:'l_'+Date.now(),funcId,funcNome:fNome,mes,ano,dados,obs,obsExtras,total,createdAt:new Date().toISOString()});
-    toast('Lançamento salvo!');
+    const exist=lancamentos.find(l=>l.funcId===funcId&&l.mes===mes&&l.ano===ano);
+    if(exist){
+      // Soma os novos valores ao lançamento que já existe no mês
+      Object.keys(dados).forEach(k=>{if(dados[k])exist.dados[k]=Math.round(((exist.dados[k]||0)+dados[k])*100)/100;});
+      exist.total=Object.values(exist.dados).reduce((a,b)=>a+(b||0),0);
+      if(obs)exist.obs=exist.obs?exist.obs+' | '+obs:obs;
+      if(obsExtras)exist.obsExtras=exist.obsExtras?exist.obsExtras+' | '+obsExtras:obsExtras;
+      lancamentos=lancamentos.filter(l=>l!==exist);lancamentos.push(exist);
+      toast('Valores somados ao lançamento de '+MESES[mes]+'/'+ano+'!');
+    }else{
+      lancamentos.push({id:'l_'+Date.now(),funcId,funcNome:fNome,mes,ano,dados,obs,obsExtras,total,createdAt:new Date().toISOString()});
+      toast('Lançamento salvo!');
+    }
   }
   // Registrar histórico
   const userTag='['+new Date().toLocaleString('pt-BR')+']';
@@ -2218,23 +2215,48 @@ function openModal(id){
   const l=lancamentos.find(l=>l.id===id);if(!l)return;
   const f=funcionarios.find(f=>f.id===l.funcId)||{nome:'?'};
   document.getElementById('modal-title').textContent=f.nome+' — '+MESES[l.mes]+'/'+l.ano;
-  const cats=getCatTotals(l.dados);
-  const catLabel={folha:'Líquido/Folha',encargos:'Encargos',beneficios:'Benefícios',extras:'Extras/Premiações'};
-  let html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'
+  // Soma todos os lançamentos da pessoa no mesmo mês (manual, férias, VT/VR, CSV...)
+  const doMes=lancamentos.filter(x=>x.funcId===l.funcId&&x.mes===l.mes&&x.ano===l.ano);
+  const dados={};
+  doMes.forEach(x=>{Object.keys(x.dados||{}).forEach(k=>{dados[k]=(dados[k]||0)+(x.dados[k]||0);});});
+  const cats=getCatTotals(dados);
+  // Rescisão do funcionário, se desligado neste mês
+  let resc=0,fgtsResc=0,tipoResc='';
+  if(f.demissao&&f.demissao.data){
+    const p=f.demissao.data.split('-');
+    if(parseInt(p[0])===l.ano&&parseInt(p[1])===l.mes){
+      resc=f.demissao.valor||0;fgtsResc=f.demissao.fgtsRescisorio||0;tipoResc=f.demissao.tipo||'';
+    }
+  }
+  const totalLancs=doMes.reduce((a,x)=>a+(x.total||0),0);
+  const totalGeral=totalLancs+resc+fgtsResc;
+  const catLabel={folha:'Líquido/Folha',encargos:'Encargos',beneficios:'Benefícios',ferias:'Férias',extras:'Extras/Premiações'};
+  let html='';
+  if(doMes.length>1) html+='<div class="info-box">ℹ️ Somando <strong>'+doMes.length+' lançamentos</strong> de '+MESES[l.mes]+'/'+l.ano+'.</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'
     +'<div class="metric-card"><div class="metric-label">Líquido/Folha</div><div class="metric-value" style="font-size:15px;">'+fmt(cats.folha)+'</div></div>'
     +'<div class="metric-card orange"><div class="metric-label">Encargos</div><div class="metric-value orange" style="font-size:15px;">'+fmt(cats.encargos)+'</div></div>'
     +'<div class="metric-card"><div class="metric-label">Benefícios</div><div class="metric-value" style="font-size:15px;">'+fmt(cats.beneficios)+'</div></div>'
     +'<div class="metric-card orange"><div class="metric-label">Extras</div><div class="metric-value green" style="font-size:15px;">'+fmt(cats.extras)+'</div></div>'
+    +(cats.ferias>0?'<div class="metric-card" style="border-left-color:#0ea5e9;"><div class="metric-label">🏖️ Férias</div><div class="metric-value" style="font-size:15px;color:#0ea5e9;">'+fmt(cats.ferias)+'</div></div>':'')
+    +(resc+fgtsResc>0?'<div class="metric-card" style="border-left-color:#dc2626;"><div class="metric-label">💼 Rescisão</div><div class="metric-value" style="font-size:15px;color:#dc2626;">'+fmt(resc+fgtsResc)+'</div></div>':'')
     +'</div><div class="divider"></div>';
-  ['folha','encargos','beneficios','extras'].forEach(cat=>{
-    const itens=CAMPOS.filter(c=>c.cat===cat&&(l.dados[c.id]||0)>0);
+  ['folha','encargos','beneficios','ferias','extras'].forEach(cat=>{
+    const itens=CAMPOS.filter(c=>c.cat===cat&&(dados[c.id]||0)>0);
     if(!itens.length)return;
     html+='<div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;padding:6px 0 3px;">'+catLabel[cat]+'</div>';
-    itens.forEach(c=>html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f3f9;font-size:13px;"><span style="color:#666">'+c.label+'</span><span style="font-weight:600;color:var(--sco-azul)">'+fmt(l.dados[c.id])+'</span></div>');
+    itens.forEach(c=>html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f3f9;font-size:13px;"><span style="color:#666">'+c.label+'</span><span style="font-weight:600;color:var(--sco-azul)">'+fmt(dados[c.id])+'</span></div>');
   });
-  html+='<div style="display:flex;justify-content:space-between;padding:12px 0 0;font-size:15px;font-weight:700;"><span style="color:var(--sco-azul)">Custo Total</span><span style="color:var(--sco-laranja)">'+fmt(l.total)+'</span></div>';
-  if(l.obsExtras) html+='<div style="background:#fdf4ff;border-radius:8px;padding:9px;margin-top:8px;font-size:12px;color:#6b21a8"><strong>Obs. extras:</strong> '+l.obsExtras+'</div>';
-  if(l.obs) html+='<div style="background:var(--sco-azul-light);border-radius:8px;padding:9px;margin-top:7px;font-size:12px;color:var(--sco-azul)"><strong>Obs:</strong> '+l.obs+'</div>';
+  if(resc+fgtsResc>0){
+    html+='<div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;padding:6px 0 3px;">Rescisão'+(tipoResc?' — '+tipoResc:'')+'</div>';
+    if(resc>0) html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f3f9;font-size:13px;"><span style="color:#666">Valor da rescisão</span><span style="font-weight:600;color:#dc2626">'+fmt(resc)+'</span></div>';
+    if(fgtsResc>0) html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f3f9;font-size:13px;"><span style="color:#666">FGTS rescisório</span><span style="font-weight:600;color:#dc2626">'+fmt(fgtsResc)+'</span></div>';
+  }
+  html+='<div style="display:flex;justify-content:space-between;padding:12px 0 0;font-size:15px;font-weight:700;"><span style="color:var(--sco-azul)">Custo Total do mês</span><span style="color:var(--sco-laranja)">'+fmt(totalGeral)+'</span></div>';
+  doMes.forEach(x=>{
+    if(x.obsExtras) html+='<div style="background:#fdf4ff;border-radius:8px;padding:9px;margin-top:8px;font-size:12px;color:#6b21a8"><strong>Obs. extras:</strong> '+x.obsExtras+'</div>';
+    if(x.obs) html+='<div style="background:var(--sco-azul-light);border-radius:8px;padding:9px;margin-top:7px;font-size:12px;color:var(--sco-azul)"><strong>Obs:</strong> '+x.obs+'</div>';
+  });
   html+='<div style="margin-top:14px;"><button class="btn btn-primary btn-sm" onclick="editarLancamento(\''+id+'\');closeModal()">✏️ Editar</button></div>';
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').classList.add('open');
@@ -4094,13 +4116,31 @@ function salvarMeta(){
   toast('✅ Meta registrada!');
 }
 
+function funcsMetas(){
+  return funcionarios.filter(function(f){
+    var tp=(f.tipo||'CLT').toUpperCase();
+    return f.ativo!==false && tp!=='PJ' && tp!=='AUTÔNOMO' && tp!=='AUTONOMO';
+  });
+}
+function aplicarSetorMetas(){
+  var d=(document.getElementById('meta-filtro-depto')||{value:''}).value;
+  var lista=funcsMetas().filter(function(f){return !d||f.depto===d;}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  var opts=lista.map(function(f){return '<option value="'+f.id+'">'+f.nome+'</option>';}).join('');
+  var ff=document.getElementById('meta-filtro-func');
+  if(ff){var cur=ff.value;ff.innerHTML='<option value="">Todos os funcionários</option>'+opts;if(lista.some(function(f){return f.id===cur;}))ff.value=cur;}
+  var gf=document.getElementById('meta-graf-func');
+  if(gf){var cg=gf.value;gf.innerHTML='<option value="">Selecione um colaborador...</option>'+opts;if(lista.some(function(f){return f.id===cg;}))gf.value=cg;}
+  renderMetasTabela();
+}
 function renderMetasTabela(){
   var filtFunc=(document.getElementById('meta-filtro-func')||{value:''}).value;
   var ano=parseInt((document.getElementById('meta-filtro-ano')||{value:'2026'}).value);
   var periodo=(document.getElementById('meta-filtro-periodo')||{value:'anual'}).value;
   var mesesFiltro=periodo==='s1'?[1,2,3,4,5,6]:periodo==='s2'?[7,8,9,10,11,12]:[1,2,3,4,5,6,7,8,9,10,11,12];
   var mesesNomes=['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  var funcs=funcionarios.filter(function(f){return f.ativo!==false;});
+  var funcs=funcsMetas();
+  var filtDepto=(document.getElementById('meta-filtro-depto')||{value:''}).value;
+  if(filtDepto)funcs=funcs.filter(function(f){return f.depto===filtDepto;});
   if(filtFunc)funcs=funcs.filter(function(f){return f.id===filtFunc;});
   funcs=funcs.slice().sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   var thead=document.getElementById('meta-thead');
@@ -4220,8 +4260,8 @@ function renderMetas(){
   var filtSel=document.getElementById('meta-filtro-func');
   if(sel){
     sel.innerHTML='<option value="">Selecione...</option>';
-    if(filtSel)filtSel.innerHTML='<option value="">Todos</option>';
-    funcionarios.filter(function(f){return f.ativo!==false;})
+    if(filtSel)filtSel.innerHTML='<option value="">Todos os funcionários</option>';
+    funcsMetas()
       .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');})
       .forEach(function(f){
         sel.innerHTML+='<option value="'+f.id+'">'+f.nome+'</option>';
@@ -4232,16 +4272,20 @@ function renderMetas(){
   if(selMes)selMes.value=new Date().getMonth()+1;
   // Popular select do gráfico
   var grafSel=document.getElementById('meta-graf-func');
-  if(grafSel&&grafSel.options.length<=1){
-    funcionarios.filter(function(f){return f.ativo!==false;})
+  if(grafSel){
+    grafSel.innerHTML='<option value="">Selecione um colaborador...</option>';
+    funcsMetas()
       .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');})
       .forEach(function(f){grafSel.innerHTML+='<option value="'+f.id+'">'+f.nome+'</option>';});
   }
-  // Ranking do mês atual
-  var rankMes=document.getElementById('meta-rank-mes');
-  if(rankMes)rankMes.value=new Date().getMonth()+1;
-  renderMetaRanking();
-  renderMetasTabela();
+  // Popular filtro de setor
+  var deptoSel=document.getElementById('meta-filtro-depto');
+  if(deptoSel){
+    var curD=deptoSel.value;
+    var deptos=[...new Set(funcsMetas().map(function(f){return f.depto;}).filter(Boolean))].sort();
+    deptoSel.innerHTML='<option value="">🏢 Todos os setores</option>'+deptos.map(function(d){return '<option value="'+d+'"'+(d===curD?' selected':'')+'>'+d+'</option>';}).join('');
+  }
+  aplicarSetorMetas();
 }
 
 // ===== PERFIL DA EQUIPE =====
@@ -4451,15 +4495,28 @@ document.addEventListener('click',function(e){
   var fxp=e.target.closest&&e.target.closest('.fer-del-periodo-btn');
   if(fxp){excluirPeriodo(fxp.dataset.fid,fxp.dataset.pid);return;}
 });
+function filtrarLancsRelatorio(mes,ano){
+  var depto=(document.getElementById('rel2-depto')||{value:''}).value;
+  return lancamentos.filter(function(l){
+    if(l.ano!==ano)return false;
+    if(mes!=='all'&&l.mes!==parseInt(mes))return false;
+    if(depto){
+      var f=funcionarios.find(function(x){return x.id===l.funcId;});
+      if(!f||f.depto!==depto)return false;
+    }
+    return true;
+  });
+}
 function renderRelatorios(){
   var mes=(document.getElementById('rel2-mes')||{value:'all'}).value;
   var ano=parseInt((document.getElementById('rel2-ano')||{value:'2026'}).value);
-
-  var dados=lancamentos.filter(function(l){
-    if(l.ano!==ano)return false;
-    if(mes!=='all'&&l.mes!==parseInt(mes))return false;
-    return true;
-  });
+  var deptoSel=document.getElementById('rel2-depto');
+  if(deptoSel){
+    var curD=deptoSel.value;
+    var deptos=[...new Set(funcionarios.map(function(f){return f.depto;}).filter(Boolean))].sort();
+    deptoSel.innerHTML='<option value="">Todos os setores</option>'+deptos.map(function(d){return '<option value="'+d+'"'+(d===curD?' selected':'')+'>'+d+'</option>';}).join('');
+  }
+  var dados=filtrarLancsRelatorio(mes,ano);
 
   // Mapeamento campo -> label
   var labels={
@@ -4560,11 +4617,7 @@ function exportarRelatoriosExcel(){
   if(typeof XLSX==='undefined'){toast('Aguarde...',false);return;}
   var mes=(document.getElementById('rel2-mes')||{value:'all'}).value;
   var ano=parseInt((document.getElementById('rel2-ano')||{value:'2026'}).value);
-  var dados=lancamentos.filter(function(l){
-    if(l.ano!==ano)return false;
-    if(mes!=='all'&&l.mes!==parseInt(mes))return false;
-    return true;
-  });
+  var dados=filtrarLancsRelatorio(mes,ano);
   var labels={'l-liquido':'Líquido Salário','l-nf-pj':'NF PJ','l-fgts':'FGTS','l-inss':'INSS',
     'l-decimo':'13º','l-ferias':'Férias','l-adiantamento':'Adiantamento','l-outros-folha':'Outros Folha',
     'l-plano-med':'Plano Médico','l-plano-med-dep':'Plano Médico Dep.','l-plano-copart':'Coparticipação',
@@ -4594,9 +4647,23 @@ function exportarRelatoriosExcel(){
 // ===== AVALIACOES =====
 var avaliacoes=JSON.parse(localStorage.getItem('rt_avaliacoes')||'[]');
 function saveAvaliacoes(){localStorage.setItem('rt_avaliacoes',JSON.stringify(avaliacoes));syncToSupabase();}
-var AV_COMP=['Comunicacao Interpessoal','Trabalho em Equipe','Proatividade','Organizacao e Planejamento','Resolucao de Conflitos','Adaptabilidade','Foco em Resultados','Etica e Comprometimento'];
-var AV_TEC=['Dominio das Ferramentas e Sistemas','Qualidade das Entregas','Conhecimento do Processo','Analise de Dados e Relatorios','Documentacao e Registros','Uso de IA e Automacao','Conhecimento Tecnico Especifico','Resolucao de Problemas'];
-var AV_PERF=[{l:'Cumprimento de Metas',p:0.20},{l:'Qualidade das Entregas',p:0.15},{l:'Prazo e Pontualidade',p:0.15},{l:'Produtividade',p:0.15},{l:'Iniciativa e Proatividade',p:0.10},{l:'Satisfacao de Clientes',p:0.10},{l:'Gestao de Recursos e Tempo',p:0.10},{l:'Impacto nos Resultados',p:0.05}];
+var AV_COMP_2026=['Trabalho em Equipe','Proatividade','Adaptabilidade'];
+var AV_TEC_2026=['Domínio Técnico da Função','Conhecimento do Processo','Análise e Solução de Problemas Técnicos'];
+var AV_PERF_2026=[{l:'Cumprimento de Metas e KPIs',p:1/3},{l:'Qualidade das Entregas',p:1/3},{l:'Prazo e Pontualidade',p:1/3}];
+var AV_COMP_ANT=['Comunicacao Interpessoal','Trabalho em Equipe','Proatividade','Organizacao e Planejamento','Resolucao de Conflitos','Adaptabilidade','Foco em Resultados','Etica e Comprometimento'];
+var AV_TEC_ANT=['Dominio das Ferramentas e Sistemas','Qualidade das Entregas','Conhecimento do Processo','Analise de Dados e Relatorios','Documentacao e Registros','Uso de IA e Automacao','Conhecimento Tecnico Especifico','Resolucao de Problemas'];
+var AV_PERF_ANT=[{l:'Cumprimento de Metas',p:0.20},{l:'Qualidade das Entregas',p:0.15},{l:'Prazo e Pontualidade',p:0.15},{l:'Produtividade',p:0.15},{l:'Iniciativa e Proatividade',p:0.10},{l:'Satisfacao de Clientes',p:0.10},{l:'Gestao de Recursos e Tempo',p:0.10},{l:'Impacto nos Resultados',p:0.05}];
+var AV_COMP=AV_COMP_2026;
+var AV_TEC=AV_TEC_2026;
+var AV_PERF=AV_PERF_2026;
+var _avFormModelo='2026',_avEditId=null;
+function setModeloFormAv(modelo){
+  _avFormModelo=modelo==='antigo'?'antigo':'2026';
+  AV_COMP=_avFormModelo==='antigo'?AV_COMP_ANT:AV_COMP_2026;
+  AV_TEC=_avFormModelo==='antigo'?AV_TEC_ANT:AV_TEC_2026;
+  AV_PERF=_avFormModelo==='antigo'?AV_PERF_ANT:AV_PERF_2026;
+  ['av-comp-tbody','av-tec-tbody','av-perf-tbody'].forEach(function(id){var e=document.getElementById(id);if(e)e.innerHTML='';});
+}
 var AV_FIT_LABELS=['Comunicacao','Lideranca','Inovacao','Excelencia','Nunca Paramos','Trabalho c/ Proposito'];
 var AV_FIT_IDS=['av-c1','av-c2','av-c3','av-c4','av-c5','av-c6'];
 
@@ -4607,26 +4674,164 @@ function nivelNota(n){
   return '<span style="color:#dc2626;font-weight:700;">A desenvolver</span>';
 }
 
+// ===== PDI MODELO 2026: regras, filtros e gráficos =====
+var EDS_REGRAS=[
+  {k:'JUNIOR I',prog:8.0,prom:null},{k:'JUNIOR II',prog:8.0,prom:null},
+  {k:'PLENO I',prog:8.0,prom:null},{k:'PLENO II',prog:8.0,prom:null},
+  {k:'SENIOR I',prog:8.5,prom:null},{k:'SENIOR II',prog:null,prom:9.5},
+  {k:'COORDENADOR',prog:null,prom:9.5}
+];
+function normTxt(t){return String(t||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();}
+function regrasAv(av){
+  if(av.modelo==='2026'&&av.tipo==='eds'){
+    var c=normTxt(av.cargo||((funcionarios.find(function(x){return x.id===av.funcId;})||{}).cargo));
+    // casa o mais específico primeiro (II antes de I)
+    var ord=EDS_REGRAS.slice().sort(function(a,b){return b.k.length-a.k.length;});
+    var r=ord.find(function(x){return c.indexOf(x.k)>=0;});
+    if(r)return {prog:r.prog,prom:r.prom};
+    return {prog:8.0,prom:9.5};
+  }
+  return {prog:7.5,prom:8.0};
+}
+function elegAv(av){
+  var r=regrasAv(av),n=av.notaFinal||0;
+  return {prog:r.prog!==null&&n>=r.prog,prom:r.prom!==null&&n>=r.prom,regras:r};
+}
+function setorAv(av){
+  var f=funcionarios.find(function(x){return x.id===av.funcId;});
+  return (f&&f.depto)||av.setor||'Sem setor';
+}
+function filtrarAvaliacoes(){
+  var per=(document.getElementById('av-hist-periodo')||{value:''}).value;
+  var dep=(document.getElementById('av-filtro-depto')||{value:''}).value;
+  var tip=(document.getElementById('av-filtro-tipo')||{value:''}).value;
+  var mod=(document.getElementById('av-filtro-modelo')||{value:''}).value;
+  var busca=(document.getElementById('av-hist-busca')||{value:''}).value.toLowerCase();
+  var stt=(document.getElementById('av-filtro-status')||{value:'ativo'}).value;
+  var ffun=(document.getElementById('av-filtro-func')||{value:''}).value;
+  return avaliacoes.filter(function(a){
+    if(ffun&&a.funcId!==ffun)return false;
+    if(stt){var fs=funcionarios.find(function(x){return x.id===a.funcId;});var ativo=!!fs&&fs.ativo!==false;if(stt==='ativo'&&!ativo)return false;if(stt==='inativo'&&ativo)return false;}
+    if(per&&a.periodo!==per)return false;
+    if(dep&&setorAv(a)!==dep)return false;
+    if(tip&&(a.tipo||'geral')!==tip)return false;
+    if(mod==='2026'&&a.modelo!=='2026')return false;
+    if(mod==='antigo'&&a.modelo==='2026')return false;
+    if(busca){var f=funcionarios.find(function(x){return x.id===a.funcId;});var nm=(f?f.nome:(a.nomePlanilha||'')).toLowerCase();if(!nm.includes(busca))return false;}
+    return true;
+  });
+}
+function popularFiltrosAv(){
+  var fs=document.getElementById('av-filtro-func');
+  if(fs){
+    var curF=fs.value;
+    var dep=(document.getElementById('av-filtro-depto')||{value:''}).value;
+    var stt=(document.getElementById('av-filtro-status')||{value:'ativo'}).value;
+    var ids=[...new Set(avaliacoes.map(function(a){return a.funcId;}).filter(Boolean))];
+    var lst=ids.map(function(id){return funcionarios.find(function(x){return x.id===id;});}).filter(function(f){
+      if(!f)return false;
+      if(stt==='ativo'&&f.ativo===false)return false;
+      if(stt==='inativo'&&f.ativo!==false)return false;
+      if(dep&&(f.depto||'')!==dep){var temAv=avaliacoes.some(function(a){return a.funcId===f.id&&setorAv(a)===dep;});if(!temAv)return false;}
+      return true;
+    }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+    if(curF&&!lst.some(function(f){return f.id===curF;}))curF='';
+    fs.innerHTML='<option value="">👤 Todos os colaboradores</option>'+lst.map(function(f){return '<option value="'+f.id+'"'+(f.id===curF?' selected':'')+'>'+f.nome+'</option>';}).join('');
+  }
+  var ds=document.getElementById('av-filtro-depto');
+  if(ds){
+    var cur=ds.value;
+    var set=[...new Set(avaliacoes.map(setorAv).concat(funcionarios.map(function(f){return f.depto;}).filter(Boolean)))].sort();
+    ds.innerHTML='<option value="">🏢 Todos os setores</option>'+set.map(function(d){return '<option value="'+d+'"'+(d===cur?' selected':'')+'>'+d+'</option>';}).join('');
+  }
+  var ps=document.getElementById('av-hist-periodo');
+  if(ps){
+    var ex={};for(var i=0;i<ps.options.length;i++)ex[ps.options[i].value]=1;
+    avaliacoes.forEach(function(a){if(a.periodo&&!ex[a.periodo]){var o=document.createElement('option');o.value=a.periodo;o.text=a.periodo.replace('-','/');ps.appendChild(o);ex[a.periodo]=1;}});
+  }
+}
+function corNotaAv(av){
+  var e=elegAv(av),n=av.notaFinal||0;
+  if(e.prom)return '#16a34a';
+  if(e.prog)return '#3b82f6';
+  if(n>=6)return '#f59e0b';
+  return '#dc2626';
+}
+function mediaCampo(lst,campo){var v=lst.map(function(a){return a[campo];}).filter(function(x){return typeof x==='number'&&!isNaN(x);});return v.length?Math.round(v.reduce(function(a,b){return a+b;},0)/v.length*10)/10:0;}
+function renderGraficosAv(lista){
+  if(typeof Chart==='undefined')return;
+  ['chartAvDimensoes','chartAvNotas'].forEach(function(id){var c=Chart.getChart(id);if(c)c.destroy();});
+  var c1=document.getElementById('chartAvDimensoes'),c2=document.getElementById('chartAvNotas');
+  if(!c1||!c2)return;
+  var dep=(document.getElementById('av-filtro-depto')||{value:''}).value;
+  var t1=document.getElementById('av-graf1-titulo');
+  var valueLabels={id:'valueLabels',afterDatasetsDraw:function(ch){var x=ch.ctx;x.save();x.font='bold 10px sans-serif';x.fillStyle='#555';x.textAlign='center';ch.data.datasets.forEach(function(ds,i){ch.getDatasetMeta(i).data.forEach(function(b,j){var v=ds.data[j];if(v)x.fillText(v,b.x,b.y-4);});});x.restore();}};
+  if(dep){
+    // Setor x empresa nas 4 dimensões (empresa = mesmo período/tipo/modelo, sem filtro de setor)
+    var sel=document.getElementById('av-filtro-depto');var sv=sel.value;sel.value='';
+    var buscaEl=document.getElementById('av-hist-busca');var bv=buscaEl?buscaEl.value:'';if(buscaEl)buscaEl.value='';
+    var empresa=filtrarAvaliacoes();sel.value=sv;if(buscaEl)buscaEl.value=bv;
+    if(t1)t1.textContent='Setor '+dep+' x média da empresa';
+    var dims=[['fitMedia','Fit Cultural'],['compMedia','Comportamental'],['tecMedia','Técnica'],['perfFinal','Performance'],['notaFinal','Nota Final']];
+    new Chart(c1.getContext('2d'),{type:'bar',data:{labels:dims.map(function(d){return d[1];}),datasets:[
+      {label:dep,data:dims.map(function(d){return mediaCampo(lista,d[0]);}),backgroundColor:'#f94603',borderRadius:5},
+      {label:'Empresa',data:dims.map(function(d){return mediaCampo(empresa,d[0]);}),backgroundColor:'#11205b',borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{min:0,max:10,grid:{color:'#f1f3f9'}},x:{grid:{display:false}}}},plugins:[valueLabels]});
+  } else {
+    if(t1)t1.textContent='Nota média por setor';
+    var porSetor={};lista.forEach(function(a){var s=setorAv(a);(porSetor[s]=porSetor[s]||[]).push(a);});
+    var ent=Object.keys(porSetor).map(function(k){return [k,mediaCampo(porSetor[k],'notaFinal'),porSetor[k].length];}).sort(function(a,b){return b[1]-a[1];});
+    new Chart(c1.getContext('2d'),{type:'bar',data:{labels:ent.map(function(e){return e[0]+' ('+e[2]+')';}),datasets:[{data:ent.map(function(e){return e[1];}),backgroundColor:ent.map(function(e){return e[1]>=8?'#16a34a':e[1]>=7.5?'#3b82f6':e[1]>=6?'#f59e0b':'#dc2626';}),borderRadius:5}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,grid:{color:'#f1f3f9'}},x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}}}},plugins:[valueLabels]});
+  }
+  // Evolução do colaborador (só quando um colaborador está selecionado)
+  var card=document.getElementById('av-evol-card');
+  var fid=(document.getElementById('av-filtro-func')||{value:''}).value;
+  if(!fid){if(card)card.style.display='none';return;}
+  if(card)card.style.display='block';
+  var MESES_ORD={Jan:1,Fev:2,Mar:3,Abr:4,Mai:5,Jun:6,Jul:7,Ago:8,Set:9,Out:10,Nov:11,Dez:12};
+  function chave(p){var x=String(p||'').split('-');return (parseInt(x[1])||0)*100+(MESES_ORD[x[0]]||0);}
+  var hist=avaliacoes.filter(function(a){return a.funcId===fid;}).sort(function(a,b){return chave(a.periodo)-chave(b.periodo);});
+  var fsel=funcionarios.find(function(x){return x.id===fid;})||{nome:''};
+  var tt=document.getElementById('av-evol-titulo');if(tt)tt.textContent='Evolução — '+fsel.nome;
+  var ultima=hist[hist.length-1]||{};
+  var rg=regrasAv(ultima);
+  var linhas=[];if(rg.prog!==null)linhas.push([rg.prog,'Progressão '+String(rg.prog).replace('.',',')]);if(rg.prom!==null)linhas.push([rg.prom,'Promoção '+String(rg.prom).replace('.',',')]);
+  var leg=document.getElementById('av-graf2-legenda');
+  if(leg)leg.textContent=hist.length+' avaliação(ões) · todos os períodos'+(hist.length<2?' · a linha de evolução aparece a partir da 2ª avaliação':'');
+  var refLines={id:'refLines',afterDraw:function(ch){var y=ch.scales.y,x=ch.ctx;linhas.forEach(function(l){var py=y.getPixelForValue(l[0]);x.save();x.strokeStyle='#999';x.setLineDash([5,4]);x.beginPath();x.moveTo(ch.chartArea.left,py);x.lineTo(ch.chartArea.right,py);x.stroke();x.setLineDash([]);x.fillStyle='#666';x.font='10px sans-serif';x.textAlign='right';x.fillText(l[1],ch.chartArea.right-2,py-3);x.restore();});}};
+  function serie(lbl,campo,cor,grossa){return {label:lbl,data:hist.map(function(a){return a[campo];}),borderColor:cor,backgroundColor:cor,borderWidth:grossa?3:1.5,pointRadius:grossa?5:3,tension:0.25,spanGaps:true};}
+  new Chart(c2.getContext('2d'),{type:'line',data:{labels:hist.map(function(a){return String(a.periodo||'').replace('-','/');}),datasets:[
+    serie('Nota Final','notaFinal','#f94603',true),
+    serie('Fit Cultural','fitMedia','#11205b'),
+    serie('Comportamental','compMedia','#3b82f6'),
+    serie('Técnica','tecMedia','#16a34a'),
+    serie('Performance','perfFinal','#a855f7')]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},tooltip:{callbacks:{label:function(c){return ' '+c.dataset.label+': '+String(c.raw).replace('.',',');}}}},
+      scales:{y:{min:0,max:10,grid:{color:'#f1f3f9'}},x:{grid:{display:false}}}},plugins:[refLines]});
+}
+
 function renderAvaliacoes(){
-  // Dashboard de métricas
+  popularFiltrosAv();
   var dashEl=document.getElementById('av-dash-metrics');
-  var periodoFiltro=(document.getElementById('av-hist-periodo')||{value:''}).value;
-  var avalFiltradas=periodoFiltro?avaliacoes.filter(function(a){return a.periodo===periodoFiltro;}):avaliacoes;
+  var avalFiltradas=filtrarAvaliacoes();
   if(dashEl&&avalFiltradas.length){
     var total=avalFiltradas.length;
-    var medias=avalFiltradas.map(function(a){return a.notaFinal||0;});
-    var mediaGeral=Math.round(medias.reduce(function(a,b){return a+b;},0)/medias.length*10)/10;
-    var eleg75=avalFiltradas.filter(function(a){return a.notaFinal>=7.5;}).length;
-    var eleg8=avalFiltradas.filter(function(a){return a.notaFinal>=8;}).length;
+    var mediaGeral=mediaCampo(avalFiltradas,'notaFinal');
+    var nProg=avalFiltradas.filter(function(a){return elegAv(a).prog;}).length;
+    var nProm=avalFiltradas.filter(function(a){return elegAv(a).prom;}).length;
+    var nDev=avalFiltradas.filter(function(a){return (a.notaFinal||0)<6;}).length;
     var cor=mediaGeral>=8?'#16a34a':mediaGeral>=7.5?'#3b82f6':mediaGeral>=6?'#f59e0b':'#dc2626';
     dashEl.innerHTML=
       '<div class="metric-card"><div class="metric-label">📋 Total avaliações</div><div class="metric-value">'+total+'</div></div>'
       +'<div class="metric-card"><div class="metric-label">🎯 Média geral</div><div class="metric-value" style="color:'+cor+';">'+mediaGeral+'</div></div>'
-      +'<div class="metric-card"><div class="metric-label">📈 Elegíveis progressão (≥7.5)</div><div class="metric-value" style="color:#3b82f6;">'+eleg75+'</div></div>'
-      +'<div class="metric-card"><div class="metric-label">🚀 Elegíveis promoção (≥8.0)</div><div class="metric-value" style="color:#16a34a;">'+eleg8+'</div></div>';
+      +'<div class="metric-card"><div class="metric-label">📈 Elegíveis progressão</div><div class="metric-value" style="color:#3b82f6;">'+nProg+'</div><div class="metric-sub">Geral ≥7,5 · EDS conforme cargo</div></div>'
+      +'<div class="metric-card"><div class="metric-label">🚀 Elegíveis promoção</div><div class="metric-value" style="color:#16a34a;">'+nProm+'</div><div class="metric-sub">Geral ≥8,0 · EDS ≥9,5</div></div>'
+      +'<div class="metric-card"><div class="metric-label">⚠️ A desenvolver (&lt;6)</div><div class="metric-value" style="color:#dc2626;">'+nDev+'</div></div>';
   } else if(dashEl){
-    dashEl.innerHTML='<div style="color:#aaa;font-size:13px;padding:8px 0;">Nenhuma avaliação no período selecionado.</div>';
+    dashEl.innerHTML='<div style="color:#aaa;font-size:13px;padding:8px 0;">Nenhuma avaliação para os filtros selecionados.</div>';
   }
+  try{renderGraficosAv(avalFiltradas);}catch(e){console.warn('Gráficos PDI:',e);}
   renderHistoricoAvaliacoes();
 
   // Popular selects (mantido para o modal manual)
@@ -4658,7 +4863,7 @@ function renderAvaliacoes(){
     pt.innerHTML=AV_PERF.map(function(p,i){
       return '<tr><td>'+(i+1)+'</td><td>'+p.l+'</td>'
         +'<td><input type="number" id="av-perf-'+i+'" min="0" max="10" step="0.1" oninput="calcMedias()" style="width:70px;text-align:center;border:1px solid #d5daea;border-radius:6px;padding:4px;"/></td>'
-        +'<td style="text-align:center;color:#888;">'+(p.p*100)+'%</td>'
+        +'<td style="text-align:center;color:#888;">'+Math.round(p.p*100)+'%</td>'
         +'<td style="text-align:center;" id="av-perf-p'+i+'">—</td></tr>';
     }).join('');
   }
@@ -4694,8 +4899,14 @@ function calcMedias(){
         +'<div class="metric-card"><div class="metric-label">🧠 Comp. (20%)</div><div class="metric-value">'+compMedia+'</div></div>'
         +'<div class="metric-card"><div class="metric-label">⚙️ Técnica (20%)</div><div class="metric-value">'+tecMedia+'</div></div>'
         +'<div class="metric-card"><div class="metric-label">🏆 Perf. (30%)</div><div class="metric-value">'+perfFinal+'</div></div>'
-        +'<div class="metric-card" style="border-left:3px solid '+(notaFinal>=7.5?'#16a34a':'#dc2626')+'"><div class="metric-label">📈 Progressão (≥7.5)</div><div class="metric-value" style="font-size:13px;">'+(notaFinal>=7.5?'✅ Elegível':'❌ Não atingiu')+'</div></div>'
-        +'<div class="metric-card" style="border-left:3px solid '+(notaFinal>=8?'#16a34a':'#dc2626')+'"><div class="metric-label">🚀 Promoção (≥8.0)</div><div class="metric-value" style="font-size:13px;">'+(notaFinal>=8?'✅ Elegível':'❌ Não atingiu')+'</div></div>';
+        +(function(){
+          var fid=(document.getElementById('av-func')||{value:''}).value;
+          var fx=funcionarios.find(function(x){return x.id===fid;})||{};
+          var e=elegAv({modelo:'2026',tipo:(document.getElementById('av-tipo')||{value:'geral'}).value,cargo:fx.cargo,funcId:fid,notaFinal:notaFinal});
+          function card(lbl,min,ok){if(min===null)return '<div class="metric-card"><div class="metric-label">'+lbl+'</div><div class="metric-value" style="font-size:13px;color:#888;">Não se aplica ao cargo</div></div>';
+            return '<div class="metric-card" style="border-left:3px solid '+(ok?'#16a34a':'#dc2626')+'"><div class="metric-label">'+lbl+' (≥'+String(min).replace('.',',')+')</div><div class="metric-value" style="font-size:13px;">'+(ok?'✅ Elegível':'❌ Não atingiu')+'</div></div>';}
+          return card('📈 Progressão',e.regras.prog,e.prog)+card('🚀 Promoção',e.regras.prom,e.prom);
+        })();
     } else {
       res.innerHTML='<div style="color:#aaa;font-size:13px;padding:8px 0;">Preencha todas as notas para ver o resultado.</div>';
     }
@@ -4719,10 +4930,14 @@ function salvarAvaliacao(){
   var tecMedia=Math.round(tecNotas.reduce(function(a,b){return a+b.nota;},0)/tecNotas.length*10)/10;
   var perfFinal=Math.round(perfNotas.reduce(function(a,b){return a+b.nota*b.peso;},0)*10)/10;
   var notaFinal=Math.round((fitMedia*0.3+compMedia*0.2+tecMedia*0.2+perfFinal*0.3)*10)/10;
-  var existIdx=avaliacoes.findIndex(function(a){return a.funcId===funcId&&a.periodo===periodo;});
+  var existIdx=_avEditId?avaliacoes.findIndex(function(a){return a.id===_avEditId;}):avaliacoes.findIndex(function(a){return a.funcId===funcId&&a.periodo===periodo;});
+  var anterior=existIdx>=0?avaliacoes[existIdx]:{};
   var av={id:existIdx>=0?avaliacoes[existIdx].id:'av_'+Date.now(),funcId:funcId,periodo:periodo,
     gestor:(document.getElementById('av-gestor')||{value:''}).value,
     tipo:(document.getElementById('av-tipo')||{value:'geral'}).value,
+    modelo:_avFormModelo==='2026'?'2026':anterior.modelo,
+    cargo:anterior.cargo||((funcionarios.find(function(x){return x.id===funcId;})||{}).cargo)||'',
+    setor:anterior.setor||((funcionarios.find(function(x){return x.id===funcId;})||{}).depto)||'',
     fitNotas:fitNotas,compNotas:compNotas,tecNotas:tecNotas,perfNotas:perfNotas,
     fitMedia:fitMedia,compMedia:compMedia,tecMedia:tecMedia,perfFinal:perfFinal,notaFinal:notaFinal,
     pontoFortes:(document.getElementById('av-pontos-fortes')||{value:''}).value,
@@ -4730,7 +4945,10 @@ function salvarAvaliacao(){
     objetivos:(document.getElementById('av-objetivos')||{value:''}).value,
     parecer:(document.getElementById('av-parecer')||{value:''}).value,
     criadoEm:new Date().toISOString()};
+  // Preserva dados que o formulário não tem (plano de ação, evolução do PDI, etc.)
+  av=Object.assign({},anterior,av);
   if(existIdx>=0){avaliacoes[existIdx]=av;}else{avaliacoes.push(av);}
+  _avEditId=null;
   saveAvaliacoes();
   toast('Avaliacao salva! Nota final: '+notaFinal);
 }
@@ -4751,20 +4969,22 @@ function renderHistoricoAvaliacoes(){
   var busca=(document.getElementById('av-hist-busca')||{value:''}).value.toLowerCase();
   var periodo=(document.getElementById('av-hist-periodo')||{value:''}).value;
   var el=document.getElementById('av-historico-lista');if(!el)return;
-  var lista=avaliacoes.slice();
-  if(periodo)lista=lista.filter(function(a){return a.periodo===periodo;});
-  if(busca){lista=lista.filter(function(a){var f=funcionarios.find(function(x){return x.id===a.funcId;});return f&&f.nome.toLowerCase().includes(busca);});}
+  var lista=filtrarAvaliacoes();
   lista.sort(function(a,b){var fa=funcionarios.find(function(x){return x.id===a.funcId;})||{nome:''};var fb=funcionarios.find(function(x){return x.id===b.funcId;})||{nome:''};return fa.nome.localeCompare(fb.nome,'pt-BR');});
   if(!lista.length){el.innerHTML='<div class="card"><div class="empty">Nenhuma avaliacao encontrada.</div></div>';return;}
   el.innerHTML=lista.map(function(av){
-    var f=funcionarios.find(function(x){return x.id===av.funcId;})||{nome:'?',cargo:'?'};
+    var f=funcionarios.find(function(x){return x.id===av.funcId;})||{nome:av.nomePlanilha||'?',cargo:av.cargo||'?'};
     var fi=funcionarios.indexOf(f);
-    var cor=av.notaFinal>=8?'#16a34a':av.notaFinal>=7.5?'#3b82f6':av.notaFinal>=6?'#f59e0b':'#dc2626';
+    var cor=corNotaAv(av);
+    var el2=elegAv(av);
+    var tags='<span class="badge '+(av.modelo==='2026'?'badge-blue':'badge-gray')+'" style="font-size:10px;margin-left:6px;">'+(av.modelo==='2026'?'Modelo 2026':'Modelo antigo')+'</span>'
+      +(av.tipo==='eds'?'<span class="badge badge-orange" style="font-size:10px;margin-left:4px;">EDS</span>':'')
+      +(el2.prom?'<span class="badge badge-green" style="font-size:10px;margin-left:4px;">🚀 Promoção</span>':el2.prog?'<span class="badge badge-blue" style="font-size:10px;margin-left:4px;">📈 Progressão</span>':'');
     return '<div class="card" style="margin-bottom:10px;">'
       +'<div style="display:flex;align-items:center;gap:12px;">'
       +'<div class="avatar" style="background:'+avatarColor(fi)+';width:36px;height:36px;font-size:12px;flex-shrink:0;">'+initials(f.nome)+'</div>'
-      +'<div style="flex:1;"><div style="font-weight:700;font-size:14px;">'+f.nome+'</div>'
-      +'<div style="font-size:12px;color:#888;">'+f.cargo+' | '+av.periodo+(av.gestor?' | '+av.gestor:'')+'</div></div>'
+      +'<div style="flex:1;"><div style="font-weight:700;font-size:14px;">'+f.nome+tags+'</div>'
+      +'<div style="font-size:12px;color:#888;">'+(av.cargo||f.cargo)+' | '+setorAv(av)+' | '+av.periodo+(av.gestor?' | '+av.gestor:'')+'</div></div>'
       +'<div style="text-align:center;min-width:70px;"><div style="font-size:26px;font-weight:800;color:'+cor+';">'+av.notaFinal+'</div><div style="font-size:10px;color:#888;">nota final</div></div>'
       +'<div style="display:flex;gap:6px;">'
       +'<button class="btn btn-primary btn-sm" onclick="verDetalhesAvaliacao(\''+av.id+'\')" style="font-size:11px;">👁️ Detalhes</button>'
@@ -4784,7 +5004,8 @@ function renderHistoricoAvaliacoes(){
 
 function editarAvaliacao(id){
   var av=avaliacoes.find(function(a){return a.id===id;});if(!av)return;
-  abrirModalAvaliacao();
+  abrirModalAvaliacao(av.modelo==='2026'?'2026':'antigo');
+  _avEditId=id;
   var sel=document.getElementById('av-func');if(sel)sel.value=av.funcId;
   var per=document.getElementById('av-periodo');if(per)per.value=av.periodo;
   // Preencher selects de mês e ano
@@ -4841,7 +5062,7 @@ function verDetalhesAvaliacao(id){
     var rows=notas.map(function(n){
       return '<tr><td style="font-size:12px;">'+n.label+'</td>'
         +'<td style="text-align:center;font-weight:700;color:'+corN(n.nota)+';">'+n.nota+'</td>'
-        +'<td style="text-align:center;color:#888;">'+(n.peso*100)+'%</td>'
+        +'<td style="text-align:center;color:#888;">'+Math.round(n.peso*100)+'%</td>'
         +'<td style="text-align:center;font-weight:700;">'+Math.round(n.nota*n.peso*100)/100+'</td></tr>';
     }).join('');
     return '<div style="margin-bottom:16px;"><div style="font-weight:700;color:var(--sco-azul);margin-bottom:6px;">🏆 Performance (Peso 30%)</div>'
@@ -4858,7 +5079,7 @@ function verDetalhesAvaliacao(id){
     +'<div style="text-align:center;"><div style="font-size:42px;font-weight:900;color:'+cor+';">'+av.notaFinal+'</div>'
     +'<div style="font-size:11px;color:#888;">nota final</div>'
     +'<div style="font-size:11px;font-weight:700;color:'+(av.notaFinal>=8?'#16a34a':av.notaFinal>=7.5?'#3b82f6':'#dc2626')+';">'
-    +(av.notaFinal>=8?'🚀 Elegível promoção':av.notaFinal>=7.5?'📈 Elegível progressão':'📊 Não elegível')
+    +(function(){var e=elegAv(av);return e.prom?'🚀 Elegível promoção':e.prog?'📈 Elegível progressão':'📊 Não elegível';})()
     +'</div></div></div>'
     +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;">'
     +'<div style="text-align:center;background:#f8f9ff;border-radius:8px;padding:10px;border-top:3px solid var(--sco-azul);"><div style="font-size:11px;color:#888;">🎯 Fit (30%)</div><div style="font-size:22px;font-weight:800;color:'+corN(av.fitMedia)+';">'+av.fitMedia+'</div></div>'
@@ -4869,7 +5090,26 @@ function verDetalhesAvaliacao(id){
     +tabelaNotas('🎯 Fit Cultural (Peso 30%)',av.fitNotas||[],true)
     +tabelaNotas('🧠 Comportamental (Peso 20%)',av.compNotas||[],false)
     +tabelaNotas('⚙️ Técnica (Peso 20%)',av.tecNotas||[],false)
-    +tabelaPerf(av.perfNotas||[]);
+    +tabelaPerf(av.perfNotas||[])
+    +(function(){
+      var h='';
+      if(av.modelo==='2026'){
+        var r=regrasAv(av);
+        h+='<div style="margin-bottom:16px;padding:10px;background:#f8f9ff;border-radius:8px;font-size:12px;">'
+          +'<strong>Modelo 2026 · '+(av.tipo==='eds'?'EDS':'Geral')+'</strong>'+(av.setor?' · Setor na planilha: '+av.setor:'')+(av.nivel?' · Nível: '+av.nivel:'')
+          +'<br>Regra aplicada: progressão '+(r.prog===null?'não se aplica':'≥ '+String(r.prog).replace('.',','))+' · promoção '+(r.prom===null?'não se aplica':'≥ '+String(r.prom).replace('.',','))+'</div>';
+      }
+      if(av.evolucaoPdi&&av.evolucaoPdi.length){
+        h+=tabelaNotas('🌱 Evolução no PDI (não entra na nota final) — Nota PDI: '+(av.notaPdi||'—'),av.evolucaoPdi,false);
+      }
+      if(av.planoAcao&&av.planoAcao.length){
+        h+='<div style="margin-bottom:16px;"><div style="font-weight:700;color:var(--sco-azul);margin-bottom:6px;">🗂️ Plano de Ação</div>'
+          +'<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th style="text-align:left;padding:4px 6px;background:#f1f3f9;">Área</th><th style="text-align:left;padding:4px 6px;background:#f1f3f9;">Ação proposta</th><th style="padding:4px 6px;background:#f1f3f9;">Prazo</th><th style="text-align:left;padding:4px 6px;background:#f1f3f9;">Indicador / Status</th></tr></thead><tbody>'
+          +av.planoAcao.map(function(p){return '<tr><td style="padding:4px 6px;">'+p.area+'</td><td style="padding:4px 6px;">'+p.acao+'</td><td style="padding:4px 6px;text-align:center;">'+p.prazo+'</td><td style="padding:4px 6px;">'+p.status+'</td></tr>';}).join('')
+          +'</tbody></table></div>';
+      }
+      return h;
+    })();
   if(av.pontoFortes||av.pontosDesenv||av.objetivos||av.parecer){
     html+='<div style="margin-bottom:16px;"><div style="font-weight:700;color:var(--sco-azul);margin-bottom:10px;">📈 PDI</div>';
     if(av.pontoFortes)html+='<div style="margin-bottom:8px;padding:10px;background:#dcfce7;border-radius:8px;font-size:12px;"><strong>Pontos Fortes:</strong><br>'+av.pontoFortes+'</div>';
@@ -4896,8 +5136,12 @@ function verDetalhesAvaliacao(id){
   }
 }
 
-function abrirModalAvaliacao(){
+function abrirModalAvaliacao(modelo){
+  setModeloFormAv(modelo||'2026');
+  _avEditId=null;
   renderAvaliacoes();
+  var tm=document.querySelector('#modal-av-manual .modal-header h2');
+  if(tm)tm.textContent=_avFormModelo==='antigo'?'✏️ Editar Avaliação (modelo antigo)':'✏️ Avaliação — Modelo 2026';
   // Limpar campos
   var fitIds=['av-c1','av-c2','av-c3','av-c4','av-c5','av-c6'];
   fitIds.forEach(function(id){var e=document.getElementById(id);if(e)e.value='';var o=document.getElementById(id+'-obs');if(o)o.value='';});
@@ -4922,6 +5166,121 @@ function syncPeriodo(){
   var MESES_AV=['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   if(m&&a&&h)h.value=MESES_AV[parseInt(m.value)]+'-'+a.value;
 }
+// ===== IMPORTAÇÃO PDI — MODELO 2026 (Geral e EDS), várias planilhas de uma vez =====
+function lerArquivoBuffer(file){
+  return new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){res(e.target.result);};r.onerror=rej;r.readAsArrayBuffer(file);});
+}
+function ehModelo2026(ws){
+  var range=XLSX.utils.decode_range(ws['!ref']||'A1:J100');
+  for(var R=range.s.r;R<=range.e.r;R++)for(var C=range.s.c;C<=range.e.c;C++){
+    var c=ws[XLSX.utils.encode_cell({r:R,c:C})];
+    if(c&&typeof c.v==='string'){var t=normTxt(c.v);if(t.indexOf('EVOLUCAO NO PDI')>=0||t.indexOf('COMPOSICAO PONDERADA')>=0)return true;}
+  }
+  return false;
+}
+function dataParaISO(v){
+  if(v===undefined||v===null||v==='')return '';
+  if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  if(typeof v==='number'&&v>20000){var d=new Date(Math.round((v-25569)*864e5));return d.toISOString().split('T')[0];}
+  var t=String(v).trim(),m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){var a=m[3].length===2?'20'+m[3]:m[3];return a+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');}
+  if(/^\d{4}-\d{2}-\d{2}/.test(t))return t.slice(0,10);
+  return '';
+}
+function parseAvaliacao2026(ws){
+  var range=XLSX.utils.decode_range(ws['!ref']||'A1:J100');
+  var cm={};
+  for(var R=range.s.r;R<=range.e.r;R++){cm[R]={};for(var C=range.s.c;C<=range.e.c;C++){var c=ws[XLSX.utils.encode_cell({r:R,c:C})];if(c&&c.v!==undefined&&c.v!==null&&String(c.v).trim()!=='')cm[R][C]=c.v;}}
+  function acha(txt){var n=normTxt(txt);for(var r in cm)for(var c in cm[r]){if(typeof cm[r][c]==='string'&&normTxt(cm[r][c])===n)return {r:parseInt(r),c:parseInt(c)};}return null;}
+  function achaContem(txt){var n=normTxt(txt);for(var r in cm)for(var c in cm[r]){if(typeof cm[r][c]==='string'&&normTxt(cm[r][c]).indexOf(n)>=0)return {r:parseInt(r),c:parseInt(c)};}return null;}
+  function valorApos(label){
+    var p=acha(label);if(!p)return '';
+    for(var c=p.c+1;c<=range.e.c;c++){var v=cm[p.r][c];if(v===undefined)continue;if(typeof v==='string'&&v.trim().slice(-1)===':')return '';return v;}
+    return '';
+  }
+  function txt(v){if(v instanceof Date)return dataParaISO(v).split('-').reverse().join('/');return v===undefined||v===null?'':String(v).trim();}
+  // coluna das notas
+  var hn=null;for(var r in cm)for(var c in cm[r]){if(!hn&&typeof cm[r][c]==='string'&&/^NOTA\s*\(0/.test(normTxt(cm[r][c]).replace(/\n/g,' ')))hn=parseInt(c);}
+  var colN=hn!==null?hn:6;
+  function nota(p){if(!p)return null;var v=cm[p.r][colN];if(v===undefined||v==='')return null;var n=parseFloat(String(v).replace(',','.'));return isNaN(n)?null:n;}
+  function bloco(itens){return itens.map(function(l){var p=acha(l);return {label:l,nota:nota(p),obs:p&&cm[p.r][8]&&typeof cm[p.r][8]==='string'?cm[p.r][8]:''};});}
+  function media(arr){var v=arr.map(function(x){return x.nota;}).filter(function(x){return x!==null;});return v.length?Math.round(v.reduce(function(a,b){return a+b;},0)/v.length*10)/10:null;}
+  var fit=bloco(['COMUNICAÇÃO','LIDERANÇA','INOVAÇÃO','EXCELÊNCIA','NUNCA PARAMOS','TRABALHO C/ PROPÓSITO']);
+  var fitLabels=['Comunicação','Liderança','Inovação','Excelência','Nunca Paramos','Trabalho c/ Propósito'];
+  fit.forEach(function(x,i){x.label=fitLabels[i];});
+  var comp=bloco(['Trabalho em Equipe','Proatividade','Adaptabilidade']);
+  var tec=bloco(['Domínio Técnico da Função','Conhecimento do Processo','Análise e Solução de Problemas Técnicos']);
+  var perf=bloco(['Cumprimento de Metas e KPIs','Qualidade das Entregas','Prazo e Pontualidade']);
+  var evo=bloco(['Comprometimento com o PDI','Evolução Percebida nas Áreas de Desenvolvimento','Aplicação Prática no Trabalho','Consistência ao Longo do Período']);
+  // Plano de ação
+  var plano=[],hA=acha('ÁREA DE DESENVOLVIMENTO');
+  if(hA){
+    var cA=hA.c,cAc=(acha('AÇÃO PROPOSTA')||{c:4}).c,cP=(acha('PRAZO')||{c:6}).c,cS=(acha('INDICADOR / STATUS')||{c:7}).c;
+    var fim=(achaContem('EVOLUCAO NO PDI')||{r:hA.r+7}).r;
+    for(var rr=hA.r+1;rr<fim;rr++){var row=cm[rr]||{};var it={area:txt(row[cA]),acao:txt(row[cAc]),prazo:txt(row[cP]),status:txt(row[cS])};if(it.area||it.acao||it.prazo||it.status)plano.push(it);}
+  }
+  // Parecer
+  var parecer='',pp=achaContem('PARECER FINAL DO GESTOR');
+  if(pp){for(var r2=pp.r+1;r2<=Math.min(pp.r+4,range.e.r);r2++){var row2=cm[r2]||{};Object.keys(row2).forEach(function(c){parecer+=(parecer?' ':'')+txt(row2[c]);});}}
+  // Tipo
+  var tipoTxt=normTxt(valorApos('Tipo (Geral/EDS):'));
+  var tipo=tipoTxt.indexOf('EDS')>=0?'eds':(tipoTxt.indexOf('GERAL')>=0?'geral':(achaContem('TABELA DE ELEGIBILIDADE EDS')?'eds':'geral'));
+  var fitMedia=media(fit),compMedia=media(comp),tecMedia=media(tec),perfFinal=media(perf);
+  var notaFinal=(fitMedia!==null&&compMedia!==null&&tecMedia!==null&&perfFinal!==null)?Math.round((fitMedia*0.3+compMedia*0.2+tecMedia*0.2+perfFinal*0.3)*10)/10:null;
+  return {
+    nome:txt(valorApos('Nome do Colaborador:')),cargo:txt(valorApos('Cargo Atual:')),setor:txt(valorApos('Setor / Área:')),
+    nivel:txt(valorApos('Nível:')),gestor:txt(valorApos('Gestor Responsável:')),dataAv:dataParaISO(valorApos('Data da Avaliação:')),
+    tipo:tipo,fitNotas:fit,compNotas:comp,tecNotas:tec,
+    perfNotas:perf.map(function(x){return {label:x.label,peso:1/3,nota:x.nota};}),
+    fitMedia:fitMedia,compMedia:compMedia,tecMedia:tecMedia,perfFinal:perfFinal,notaFinal:notaFinal,
+    evolucaoPdi:evo.filter(function(x){return x.nota!==null;}),notaPdi:media(evo),
+    pontoFortes:txt(valorApos('Pontos Fortes:')),pontosDesenv:txt(valorApos('Pontos a Desenvolver:')),objetivos:txt(valorApos('Objetivos de Desenvolvimento:')),
+    planoAcao:plano,parecer:parecer
+  };
+}
+async function importarAvaliacoesXLSX(files){
+  if(!files||!files.length)return;
+  if(typeof XLSX==='undefined'){toast('Aguarde a biblioteca carregar e tente de novo.',false);return;}
+  var MES_AB=['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var ok=[],subst=0,naoEnc=[],incompletas=[],semData=0,antigas=[];
+  for(var i=0;i<files.length;i++){
+    var file=files[i];
+    try{
+      var buf=await lerArquivoBuffer(file);
+      var wb=XLSX.read(buf,{type:'array',cellDates:true,cellFormula:false});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      if(!ehModelo2026(ws)){antigas.push(file);continue;}
+      var d=parseAvaliacao2026(ws);
+      if(!d.nome){incompletas.push(file.name+' (sem nome)');continue;}
+      if(d.notaFinal===null){incompletas.push(d.nome+' (notas incompletas)');continue;}
+      var f=findFuncByNome(d.nome);
+      if(!f){naoEnc.push(d.nome);continue;}
+      var periodo;
+      if(d.dataAv){var pt=d.dataAv.split('-');periodo=MES_AB[parseInt(pt[1])]+'-'+pt[0];}
+      else{var hj=new Date();periodo=MES_AB[hj.getMonth()+1]+'-'+hj.getFullYear();semData++;}
+      var idx=avaliacoes.findIndex(function(a){return a.funcId===f.id&&a.periodo===periodo;});
+      var av=Object.assign({id:idx>=0?avaliacoes[idx].id:'av_'+Date.now()+'_'+i,funcId:f.id,periodo:periodo,modelo:'2026',
+        nomePlanilha:d.nome,criadoEm:new Date().toISOString(),arquivo:file.name},d);
+      delete av.nome;
+      if(idx>=0){avaliacoes[idx]=av;subst++;}else{avaliacoes.push(av);}
+      ok.push(f.nome);
+    }catch(err){console.error(err);incompletas.push(file.name+' (erro: '+err.message+')');}
+  }
+  if(ok.length)saveAvaliacoes();
+  // Planilhas do modelo antigo seguem pelo importador antigo
+  antigas.forEach(function(fl){importarAvaliacaoXLSX(fl);});
+  var inp=document.getElementById('av-xlsx-input');if(inp)inp.value='';
+  renderAvaliacoes();
+  var msg=[];
+  if(ok.length)msg.push('✅ '+ok.length+' avaliação(ões) importada(s)'+(subst?' ('+subst+' substituída(s) no mesmo período)':''));
+  if(antigas.length)msg.push('📄 '+antigas.length+' no modelo antigo');
+  if(naoEnc.length)msg.push('⚠️ Não encontrados no cadastro: '+naoEnc.join(', '));
+  if(incompletas.length)msg.push('⚠️ Ignoradas: '+incompletas.join(', '));
+  if(semData)msg.push('ℹ️ '+semData+' sem data da avaliação (usado o mês atual)');
+  if(msg.length>1||naoEnc.length||incompletas.length){alert(msg.join('\n\n'));}
+  toast(msg[0]||'Nenhuma avaliação importada.',!!ok.length);
+}
+
 function importarAvaliacaoXLSX(file){
   if(!file)return;
   if(typeof XLSX==='undefined'){toast('Aguarde...',false);return;}
@@ -5430,12 +5789,38 @@ function renderTreinamentos(){
     });
   }
   if(mes){lista=lista.filter(function(t){return t.data&&t.data.substring(0,7)===mes;});}
+  // Popular e aplicar filtros de funcionário e setor
+  var selF=document.getElementById('trei-filtro-func'),selD=document.getElementById('trei-filtro-depto');
+  var filtFunc=selF?selF.value:'',filtDepto=selD?selD.value:'';
+  if(selD){
+    var deptos=[...new Set(funcionarios.map(function(f){return f.depto;}).filter(Boolean))].sort();
+    selD.innerHTML='<option value="">Todos os setores</option>'+deptos.map(function(d){return '<option value="'+d+'"'+(d===filtDepto?' selected':'')+'>'+d+'</option>';}).join('');
+  }
+  if(selF){
+    var fl=funcionarios.filter(function(f){return f.ativo!==false&&(!filtDepto||f.depto===filtDepto);}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+    if(filtFunc&&!fl.some(function(f){return f.id===filtFunc;}))filtFunc='';
+    selF.innerHTML='<option value="">Todos os funcionários</option>'+fl.map(function(f){return '<option value="'+f.id+'"'+(f.id===filtFunc?' selected':'')+'>'+f.nome+'</option>';}).join('');
+  }
+  if(filtFunc){lista=lista.filter(function(t){return (t.participantes||[]).includes(filtFunc);});}
+  if(filtDepto){lista=lista.filter(function(t){return (t.participantes||[]).some(function(fid){var f=funcionarios.find(function(x){return x.id===fid;});return f&&f.depto===filtDepto;});});}
   lista.sort(function(a,b){return (b.data||'').localeCompare(a.data||'');});
 
   // Cards de indicadores
   var ano=mes?parseInt(mes.split('-')[0]):new Date().getFullYear();
   var treisAno=treinamentos.filter(function(t){return t.data&&t.data.startsWith(ano);});
-  var totalHorasAno=treisAno.reduce(function(a,t){return a+(parseFloat(t.carga)||0)*(t.participantes||[]).length;},0);
+  // Conta só os participantes do setor/funcionário filtrado
+  function partOk(fid){
+    if(filtFunc&&fid!==filtFunc)return false;
+    if(filtDepto){var fx=funcionarios.find(function(x){return x.id===fid;});if(!fx||fx.depto!==filtDepto)return false;}
+    return true;
+  }
+  function nPartOk(t){return (t.participantes||[]).filter(partOk).length;}
+  function horasT(t){return (parseFloat(t.carga)||0)*nPartOk(t);}
+  var totalHorasAno=treisAno.filter(function(t){return nPartOk(t)>0;}).reduce(function(a,t){return a+horasT(t);},0);
+  var horasMes=lista.reduce(function(a,t){return a+horasT(t);},0);
+  var pessoasMes=new Set();lista.forEach(function(t){(t.participantes||[]).filter(partOk).forEach(function(fid){pessoasMes.add(fid);});});
+  var escopo=filtFunc?((funcionarios.find(function(x){return x.id===filtFunc;})||{nome:''}).nome.split(' ')[0]):(filtDepto?'setor '+filtDepto:'');
+  var escopoTxt=escopo?' — '+escopo:'';
   var totalTreinAno=treisAno.length;
   // Horas por funcionário no período filtrado
   var horasPorFunc={};
@@ -5469,8 +5854,8 @@ function renderTreinamentos(){
 
   var dashHtml='<div class="metrics-grid" style="margin-bottom:16px;">'
     +'<div class="metric-card"><div class="metric-label">🎓 Treinamentos '+(mes?mes.split('-').reverse().join('/'):'em '+ano)+'</div><div class="metric-value">'+lista.length+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">⏱️ Total horas (participante×h) em '+ano+'</div><div class="metric-value">'+totalHorasAno+'h</div></div>'
-    +(mes?'<div class="metric-card"><div class="metric-label">⏱️ Total horas no mês '+mes.split('-').reverse().join('/')+'</div><div class="metric-value">'+lista.reduce(function(a,t){return a+(parseFloat(t.carga)||0)*(t.participantes||[]).length;},0)+'h</div></div>':'')
+    +'<div class="metric-card"><div class="metric-label">⏱️ Total horas em '+ano+escopoTxt+'</div><div class="metric-value">'+totalHorasAno+'h</div></div>'
+    +(mes?'<div class="metric-card" style="border-left:4px solid var(--sco-laranja);"><div class="metric-label">⏱️ Horas no mês '+mes.split('-').reverse().join('/')+escopoTxt+'</div><div class="metric-value" style="color:var(--sco-laranja);">'+horasMes+'h</div><div style="font-size:11px;color:#aaa;">'+pessoasMes.size+' pessoa(s) treinada(s)</div></div>':'')
     +buscaCard
     +'</div>';
 
@@ -5498,7 +5883,7 @@ function renderTreinamentos(){
       +'</div>'
       +'</div>'
       +'<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">'
-      +'<button class="btn btn-sm" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;" id="btn-part-'+t.id+'">👥 '+nPart+' participante'+(nPart!==1?'s':'')+'</button>'
+      +'<button class="btn btn-sm" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;font-size:11px;" id="btn-part-'+t.id+'">👥 '+((filtFunc||filtDepto)?nPartOk(t)+' de ':'')+nPart+' participante'+(nPart!==1?'s':'')+((filtFunc||filtDepto)?' · '+horasT(t)+'h':'')+'</button>'
       +'<button class="btn btn-warning btn-sm" style="font-size:11px;" id="btn-edit-'+t.id+'">✏️</button>'
       +'<button class="btn btn-danger btn-sm" style="font-size:11px;" id="btn-del-'+t.id+'">🗑️</button>'
       +'</div>'
@@ -7201,6 +7586,7 @@ setTimeout(function(){
     <select id="rel2-ano" onchange="renderRelatorios()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
       <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
     </select>
+    <select id="rel2-depto" onchange="renderRelatorios()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="">Todos os setores</option></select>
     <button class="btn btn-sm" onclick="exportarRelatoriosExcel()" style="background:#1d6f42;color:#fff;border:none;font-weight:600;">📊 Exportar Excel</button>
   </div>
   <div class="card" style="margin-bottom:14px;">
@@ -7227,7 +7613,6 @@ setTimeout(function(){
   <div class="metrics-grid" id="av-dash-metrics" style="margin-bottom:16px;"></div>
   <!-- Filtros e botões -->
   <div class="filter-bar" style="margin-bottom:16px;">
-    <input id="av-hist-busca" placeholder="🔍 Buscar colaborador..." style="min-width:200px;" oninput="renderAvaliacoes()"/>
     <select id="av-hist-periodo" onchange="renderAvaliacoes()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
       <option value="">Todos os períodos</option>
       <option value="Jan-2026">Jan/2026</option><option value="Fev-2026">Fev/2026</option>
@@ -7237,24 +7622,22 @@ setTimeout(function(){
       <option value="Set-2026">Set/2026</option><option value="Out-2026">Out/2026</option>
       <option value="Nov-2026">Nov/2026</option><option value="Dez-2026">Dez/2026</option>
     </select>
-    <button class="btn btn-primary" onclick="document.getElementById('av-xlsx-input').click()" style="background:#6366f1;">📥 Importar planilha</button>
-    <input type="file" id="av-xlsx-input" accept=".xlsx,.xls" style="display:none;" onchange="importarAvaliacaoXLSX(this.files[0])"/>
+    <select id="av-filtro-depto" onchange="renderAvaliacoes()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;border-color:var(--sco-azul);font-weight:600;"><option value="">🏢 Todos os setores</option></select>
+    <select id="av-filtro-func" onchange="renderAvaliacoes()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;min-width:200px;"><option value="">👤 Todos os colaboradores</option></select>
+    <select id="av-filtro-status" onchange="renderAvaliacoes()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="ativo">✅ Ativos</option><option value="inativo">🔴 Desligados</option><option value="">👥 Todos</option></select>
+    <button class="btn btn-primary" onclick="document.getElementById('av-xlsx-input').click()" style="background:#6366f1;">📥 Importar planilhas</button>
+    <input type="file" id="av-xlsx-input" accept=".xlsx,.xls" multiple style="display:none;" onchange="importarAvaliacoesXLSX(this.files)"/>
     <button class="btn btn-orange" onclick="abrirModalAvaliacao()">✏️ Nova avaliação manual</button>
+  </div>
+  <!-- Gráficos de desempenho -->
+  <div id="av-graficos" style="margin-bottom:14px;">
+    <div class="card"><div class="card-title"><span class="dot"></span><span id="av-graf1-titulo">Média por dimensão</span></div><div style="position:relative;height:260px;"><canvas id="chartAvDimensoes"></canvas></div></div>
+    <div class="card" id="av-evol-card" style="display:none;"><div class="card-title"><span class="dot"></span><span id="av-evol-titulo">Evolução do colaborador</span></div><div id="av-graf2-legenda" style="font-size:11px;color:#888;margin:-6px 0 8px;"></div><div style="position:relative;height:280px;"><canvas id="chartAvNotas"></canvas></div></div>
   </div>
   <!-- Lista de avaliações -->
   <div id="av-historico-lista"></div>
   <!-- Formulário oculto (mantido para compatibilidade) -->
   
-  <div id="av-sub-historico" style="display:none;">
-    <div class="filter-bar">
-      <input id="av-hist-busca" placeholder="🔍 Buscar colaborador..." style="min-width:200px;" oninput="renderHistoricoAvaliacoes()"/>
-      <select id="av-hist-periodo" onchange="renderHistoricoAvaliacoes()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;">
-        <option value="">Todos os períodos</option>
-        <option value="Jan-2026">Jan/2026</option><option value="Fev-2026">Fev/2026</option><option value="Mar-2026">Mar/2026</option><option value="Abr-2026">Abr/2026</option><option value="Mai-2026">Mai/2026</option><option value="Jun-2026">Jun/2026</option><option value="Jul-2026">Jul/2026</option><option value="Ago-2026">Ago/2026</option><option value="Set-2026">Set/2026</option><option value="Out-2026">Out/2026</option><option value="Nov-2026">Nov/2026</option><option value="Dez-2026">Dez/2026</option>
-      </select>
-    </div>
-    <div id="av-historico-lista"></div>
-  </div>
 </div>
 
 <div id="modal-av-manual" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;">
@@ -7265,10 +7648,10 @@ setTimeout(function(){
     </div>
     <div style="padding:0 20px 20px;">
       <div class="form-grid" style="margin-bottom:16px;">
-        <div class="form-group"><label>Colaborador *</label><select id="av-func"><option value="">Selecione...</option></select></div>
+        <div class="form-group"><label>Colaborador *</label><select id="av-func" onchange="calcMedias()"><option value="">Selecione...</option></select></div>
         <div class="form-group"><label>Período *</label><div style="display:flex;gap:6px;"><select id="av-periodo-mes" onchange="syncPeriodo()" style="flex:1;padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6" selected>Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select><select id="av-periodo-ano" onchange="syncPeriodo()" style="flex:1;padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option></select></div><input type="hidden" id="av-periodo" value="Jun-2026"/></div>
         <div class="form-group"><label>Gestor</label><input id="av-gestor" placeholder="Nome do gestor"/></div>
-        <div class="form-group"><label>Tipo</label><select id="av-tipo"><option value="geral">Geral</option><option value="eds">EDS</option></select></div>
+        <div class="form-group"><label>Tipo</label><select id="av-tipo" onchange="calcMedias()"><option value="geral">Geral</option><option value="eds">EDS</option></select></div>
       </div>
       <div style="margin-bottom:12px;"><div style="font-weight:700;color:var(--sco-azul);margin-bottom:8px;">🎯 Fit Cultural — Peso 30%</div>
       <table style="width:100%;border-collapse:collapse;">
@@ -7312,6 +7695,8 @@ setTimeout(function(){
     <div class="filter-bar" style="margin-bottom:16px;">
       <input id="trei-busca" placeholder="🔍 Buscar treinamento ou colaborador..." style="min-width:220px;" oninput="renderTreinamentos()"/>
       <input type="month" id="trei-mes" onchange="renderTreinamentos()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"/>
+      <select id="trei-filtro-func" onchange="renderTreinamentos()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="">Todos os funcionários</option></select>
+      <select id="trei-filtro-depto" onchange="renderTreinamentos()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="">Todos os setores</option></select>
       <button class="btn btn-orange" onclick="abrirModalTreinamento()">➕ Novo Treinamento</button>
     </div>
     <div id="trei-lista"></div>
