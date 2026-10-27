@@ -3492,6 +3492,84 @@ function limparHistorico(){
 }
 
 // ===== ALERTAS =====
+// ===== FORMULÁRIOS DE AVALIAÇÃO DE EXPERIÊNCIA (45 e 90 dias) =====
+// Os modelos ficam na pasta /modelos do repositório. Só as células de dados são alteradas:
+// formatação, logo e listas de opções do modelo continuam iguais.
+var EXP_MODELOS={
+  '45':{arquivo:'modelos/avaliacao_exp_45.xlsx',campos:{nome:'B2',funcao:'B3',setor:'B4',admissao:'D2',venc:'D3'}},
+  '90':{arquivo:'modelos/avaliacao_exp_90.xlsx',campos:{nome:'C2',funcao:'C3',setor:'C4',admissao:'E2',venc:'E3'}}
+};
+var _expModeloCache={};
+function _xmlEsc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _setCelulaXml(xml,ref,texto){
+  var re=new RegExp('<c r="'+ref+'"([^>]*?)(/>|>[\\s\\S]*?</c>)');
+  var m=xml.match(re);
+  if(!m)throw new Error('Célula '+ref+' não encontrada no modelo');
+  var attrs=m[1].replace(/\s+t="[^"]*"/,'');
+  return xml.replace(m[0],'<c r="'+ref+'"'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+_xmlEsc(texto)+'</t></is></c>');
+}
+function _dataLocal(v){
+  if(!v)return null;
+  var t=String(v).trim(),m;
+  if((m=t.match(/^(\d{4})-(\d{2})-(\d{2})/)))return new Date(+m[1],+m[2]-1,+m[3]);
+  if((m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)))return new Date(+m[3],+m[2]-1,+m[1]);
+  var d=new Date(t);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function _fmtBR(d){return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();}
+function _escolherModeloLocal(tipo){
+  return new Promise(function(res,rej){
+    if(!confirm('Não consegui abrir o modelo de '+tipo+' dias automaticamente.\n\nClique em OK e selecione o arquivo do modelo (Excel).'))return rej(new Error('cancelado'));
+    var inp=document.createElement('input');inp.type='file';inp.accept='.xlsx';
+    inp.onchange=function(){var f=inp.files[0];if(!f)return rej(new Error('cancelado'));f.arrayBuffer().then(res,rej);};
+    inp.click();
+  });
+}
+async function _carregarModeloExp(tipo){
+  if(_expModeloCache[tipo])return _expModeloCache[tipo];
+  var buf;
+  try{
+    var r=await fetch(EXP_MODELOS[tipo].arquivo,{cache:'no-cache'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    buf=await r.arrayBuffer();
+  }catch(e){buf=await _escolherModeloLocal(tipo);}
+  _expModeloCache[tipo]=buf;
+  return buf;
+}
+async function gerarAvaliacaoExp(funcId,tipo){
+  var f=funcionarios.find(function(x){return x.id===funcId;});
+  if(!f){toast('Funcionário não encontrado.',false);return;}
+  if(typeof XLSX==='undefined'||!XLSX.CFB){toast('Aguarde o sistema carregar e tente de novo.',false);return;}
+  var adm=_dataLocal(f.admissao);
+  if(!adm){toast('Funcionário sem data de admissão válida.',false);return;}
+  // O dia da admissão conta como 1º dia do contrato
+  var venc=new Date(adm);venc.setDate(venc.getDate()+parseInt(tipo)-1);
+  try{
+    var buf=await _carregarModeloExp(tipo);
+    var cfb=XLSX.CFB.read(new Uint8Array(buf),{type:'array'});
+    var ent=XLSX.CFB.find(cfb,'/xl/worksheets/sheet1.xml');
+    if(!ent)throw new Error('Planilha não encontrada no modelo');
+    var xml=new TextDecoder('utf-8').decode(ent.content);
+    var c=EXP_MODELOS[tipo].campos;
+    xml=_setCelulaXml(xml,c.nome,f.nome||'');
+    xml=_setCelulaXml(xml,c.funcao,f.cargo||'');
+    xml=_setCelulaXml(xml,c.setor,f.depto||'');
+    xml=_setCelulaXml(xml,c.admissao,_fmtBR(adm));
+    xml=_setCelulaXml(xml,c.venc,_fmtBR(venc));
+    ent.content=new TextEncoder().encode(xml);
+    ent.size=ent.content.length;
+    var out=XLSX.CFB.write(cfb,{fileType:'zip',type:'array'});
+    var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var nomeArq='Avaliacao_Experiencia_'+tipo+'_dias_'+(f.nome||'').trim().replace(/\s+/g,'_').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9_]/g,'')+'.xlsx';
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nomeArq;
+    document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
+    toast('📄 Avaliação de '+tipo+' dias gerada para '+f.nome.split(' ')[0]+'!');
+  }catch(e){
+    if(e&&e.message==='cancelado')return;
+    console.error(e);toast('Erro ao gerar a avaliação: '+e.message,false);
+  }
+}
+
 function renderAlertas(){
   const hoje = new Date();
   const el = document.getElementById('alertas-body');
@@ -3527,6 +3605,9 @@ function renderAlertas(){
         +'<div style="font-size:11px;color:#888;">'+a.f.cargo+' • Experiência '+a.tipo+'</div>'
         +'<div style="font-size:12px;font-weight:700;color:'+cor+';margin-top:3px;">'
         +(a.diff===0?'⚠️ Vence HOJE!':a.diff===1?'⚠️ Vence amanhã!':'Vence em '+a.diff+' dias — '+a.data.toLocaleDateString('pt-BR'))
+        +'</div>'
+        +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">'
+        +['45','90'].map(function(t){var atual=a.tipo===t+' dias';return '<button class="btn btn-sm '+(atual?'btn-orange':'')+'" style="font-size:11px;'+(atual?'':'background:#fff;border:1px solid #d5daea;color:#555;')+'" onclick="gerarAvaliacaoExp(\''+a.f.id+'\',\''+t+'\')">📄 Avaliação '+t+' dias</button>';}).join('')
         +'</div></div></div>';
     });
     html += '</div></div>';
