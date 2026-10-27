@@ -6462,6 +6462,7 @@ async function fazerLogin(){
       btn.textContent='Entrar';
       btn.disabled=false;
       loadFromSupabase();
+      setTimeout(function(){carregarChecklistDoSupabase();}, 1000);
     }
   } catch(e) {
     erro.textContent='Erro ao fazer login. Tente novamente.';
@@ -6632,8 +6633,11 @@ function getChecklistTemplates(){
   if(saved){ try{ return JSON.parse(saved); }catch(e){} }
   return JSON.parse(JSON.stringify(_checklistTemplates));
 }
-function saveChecklistTemplates(t){
+async function saveChecklistTemplates(t){
   localStorage.setItem('rt_checklist_templates', JSON.stringify(t));
+  // Salva também no Supabase, para valer em qualquer computador/navegador/login
+  var res = await supa.from('configuracoes').upsert([{chave:'checklist_templates',valor:t}]);
+  if(res && res.error) throw res.error;
 }
 
 // Persistência do progresso por funcionário
@@ -6641,6 +6645,18 @@ function getChecklistProgresso(){
   try{ return JSON.parse(localStorage.getItem('rt_checklist_progresso')||'{}'); }catch(e){return {};}
 }
 async function carregarChecklistDoSupabase(){
+  // Modelos de checklist (Config. Checklist)
+  try{
+    var rt = await supa.from('configuracoes').select('valor').eq('chave','checklist_templates').maybeSingle();
+    if(rt.data && rt.data.valor){
+      localStorage.setItem('rt_checklist_templates', JSON.stringify(rt.data.valor));
+      console.log('✅ Modelos de checklist carregados do Supabase');
+    } else if(!rt.error){
+      // Ainda não existe no Supabase: envia a versão deste navegador (se tiver sido personalizada)
+      var local = localStorage.getItem('rt_checklist_templates');
+      if(local){ try{ await supa.from('configuracoes').upsert([{chave:'checklist_templates',valor:JSON.parse(local)}]); console.log('✅ Modelos de checklist enviados ao Supabase'); }catch(e2){} }
+    }
+  }catch(e){ console.warn('Modelos de checklist não carregados do Supabase', e); }
   try{
     var res = await supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').single();
     if(res.data && res.data.valor){
@@ -6759,16 +6775,27 @@ function fecharChecklist(){
 
 var _editandoChecklist = null;
 
-function abrirConfigChecklist(){
+async function abrirConfigChecklist(){
+  try{ await carregarChecklistDoSupabase(); }catch(e){}
   _editandoChecklist = getChecklistTemplates();
-  renderConfigChecklist('admissao_CLT');
+  document.getElementById('cfg-checklist-lista').innerHTML='';
+  renderConfigChecklist('admissao_CLT', true);
   document.getElementById('modal-config-checklist').style.display='flex';
 }
 function fecharConfigChecklist(){
   document.getElementById('modal-config-checklist').style.display='none';
   _editandoChecklist = null;
 }
-function renderConfigChecklist(tipo){
+// Guarda o que está digitado nos campos antes de redesenhar a lista
+function _capturarInputsChecklist(){
+  if(!_editandoChecklist || !_editandoChecklist._tipoAtivo) return;
+  var t = _editandoChecklist._tipoAtivo;
+  document.querySelectorAll('#cfg-checklist-lista input').forEach(function(inp, i){
+    if(_editandoChecklist[t] && i < _editandoChecklist[t].length) _editandoChecklist[t][i] = inp.value;
+  });
+}
+function renderConfigChecklist(tipo, semCaptura){
+  if(!semCaptura) _capturarInputsChecklist();
   _editandoChecklist._tipoAtivo = tipo;
   document.querySelectorAll('.cfg-ck-tab').forEach(function(t){
     t.style.background = t.dataset.tipo===tipo?'#11205b':'transparent';
@@ -6786,17 +6813,19 @@ function renderConfigChecklist(tipo){
   });
 }
 function removerItemChecklist(i){
+  _capturarInputsChecklist();
   var tipo = _editandoChecklist._tipoAtivo;
   _editandoChecklist[tipo].splice(i,1);
-  renderConfigChecklist(tipo);
+  renderConfigChecklist(tipo, true);
 }
 function adicionarItemChecklist(){
   var tipo = _editandoChecklist._tipoAtivo;
   var novoItem = document.getElementById('cfg-novo-item').value.trim();
   if(!novoItem){toast('Digite o nome da tarefa.');return;}
+  _capturarInputsChecklist();
   _editandoChecklist[tipo].push(novoItem);
   document.getElementById('cfg-novo-item').value='';
-  renderConfigChecklist(tipo);
+  renderConfigChecklist(tipo, true);
 }
 function salvarConfigChecklist(){
   var tipo = _editandoChecklist._tipoAtivo;
@@ -6807,9 +6836,17 @@ function salvarConfigChecklist(){
     admissao_PJ: _editandoChecklist.admissao_PJ,
     desligamento: _editandoChecklist.desligamento
   };
-  saveChecklistTemplates(toSave);
-  fecharConfigChecklist();
-  toast('✅ Checklist salvo!');
+  var btnS = document.querySelector('#modal-config-checklist .btn-orange');
+  if(btnS){btnS.disabled=true;btnS.textContent='Salvando...';}
+  saveChecklistTemplates(toSave).then(function(){
+    fecharConfigChecklist();
+    toast('✅ Checklist salvo!');
+  }).catch(function(e){
+    console.error('Erro ao salvar checklist no Supabase:', e);
+    toast('⚠️ Salvo só neste navegador — não consegui salvar na nuvem. Tente de novo.', false);
+  }).finally(function(){
+    if(btnS){btnS.disabled=false;btnS.textContent='💾 Salvar';}
+  });
 }
 
 
