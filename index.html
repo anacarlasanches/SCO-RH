@@ -248,6 +248,19 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
   background: #f0f2fa;
 }
 .navbar { display: none !important; }
+
+/* ===== PERFIL ASSISTENTE ===== */
+body.perfil-assistente .so-admin{display:none!important;}
+body.perfil-assistente #page-rh table th:nth-child(n+5),
+body.perfil-assistente #page-rh table td:nth-child(n+5),
+body.perfil-assistente #page-rh tr.rh-total{display:none!important;}
+body.perfil-assistente #page-ferias-ctrl .fer-np-btn,
+body.perfil-assistente #page-ferias-ctrl .fer-gozo-btn,
+body.perfil-assistente #page-ferias-ctrl .fer-pagar-btn,
+body.perfil-assistente #page-ferias-ctrl .fer-edit-gozo-btn,
+body.perfil-assistente #page-ferias-ctrl .rm-gozo-btn{display:none!important;}
+.perfil-badge{display:none;}
+body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;margin-left:8px;}
 </style>
 </head>
 <body>
@@ -262,18 +275,18 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
       <div class="brand-sub">Gente & Gestão</div>
     </div>
     <div id="sidebar-nav">
-      <div class="sidebar-item active" onclick="sidebarGoTo('dashboard', this)" data-page="dashboard"><span class="s-icon">📊</span><span class="s-label">Dashboard</span></div>
-      <div class="sidebar-item" onclick="sidebarGoTo('relatorio', this)" data-page="relatorio"><span class="s-icon">📋</span><span class="s-label">Lançamentos</span></div>
+      <div class="so-admin sidebar-item active" onclick="sidebarGoTo('dashboard', this)" data-page="dashboard"><span class="s-icon">📊</span><span class="s-label">Dashboard</span></div>
+      <div class="so-admin sidebar-item" onclick="sidebarGoTo('relatorio', this)" data-page="relatorio"><span class="s-icon">📋</span><span class="s-label">Lançamentos</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('funcionarios', this)" data-page="funcionarios"><span class="s-icon">👥</span><span class="s-label">Funcionários</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('ferias-ctrl', this)" data-page="ferias-ctrl"><span class="s-icon">🏖️</span><span class="s-label">Férias</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('metas', this)" data-page="metas"><span class="s-icon">🎯</span><span class="s-label">Metas</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('rh', this)" data-page="rh"><span class="s-icon">📈</span><span class="s-label">RH</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('alertas', this)" data-page="alertas"><span class="s-icon">🔔</span><span class="s-label">Alertas</span></div>
-      <div class="sidebar-item" onclick="sidebarGoTo('historico', this)" data-page="historico"><span class="s-icon">📜</span><span class="s-label">Histórico</span></div>
+      <div class="so-admin sidebar-item" onclick="sidebarGoTo('historico', this)" data-page="historico"><span class="s-icon">📜</span><span class="s-label">Histórico</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('perfil-equipe', this)" data-page="perfil-equipe"><span class="s-icon">👥</span><span class="s-label">Perfil da Equipe</span></div>
-      <div class="sidebar-item" onclick="sidebarGoTo('relatorios', this)" data-page="relatorios"><span class="s-icon">📊</span><span class="s-label">Relatórios</span></div>
+      <div class="so-admin sidebar-item" onclick="sidebarGoTo('relatorios', this)" data-page="relatorios"><span class="s-icon">📊</span><span class="s-label">Relatórios</span></div>
       <div class="sidebar-item" onclick="sidebarGoTo('avaliacoes', this)" data-page="avaliacoes"><span class="s-icon">🌱</span><span class="s-label">Desenvolvimento</span></div>
-      <div class="sidebar-item" onclick="sidebarGoTo('importacoes', this)" data-page="importacoes"><span class="s-icon">📥</span><span class="s-label">Importações</span></div>
+      <div class="so-admin sidebar-item" onclick="sidebarGoTo('importacoes', this)" data-page="importacoes"><span class="s-icon">📥</span><span class="s-label">Importações</span></div>
     </div>
     <div id="sidebar-footer">
       <div class="sidebar-item" onclick="sidebarGoTo('vt-vr',this)" data-page="vt-vr"><span class="s-icon">🚌</span><span class="s-label">VT & VR</span></div>
@@ -285,10 +298,10 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
   <!-- Área principal -->
   <div id="main-area">
     <div id="main-topbar">
-      <span style="font-size:13px;font-weight:700;color:#11205b;flex:1;" id="topbar-title">Dashboard</span>
+      <span style="font-size:13px;font-weight:700;color:#11205b;flex:1;"><span id="topbar-title">Dashboard</span><span class="perfil-badge">👤 Perfil assistente</span></span>
       
-    <button class="btn btn-sm" onclick="exportarDados()" style="background:rgba(17,32,91,0.08);color:#11205b;font-size:11px;">📤 Exportar</button>
-    <button class="btn btn-sm" onclick="document.getElementById('import-dados-input').click()" style="background:rgba(17,32,91,0.08);color:#11205b;font-size:11px;">📥 Importar</button>
+    <button class="btn btn-sm so-admin" onclick="exportarDados()" style="background:rgba(17,32,91,0.08);color:#11205b;font-size:11px;">📤 Exportar</button>
+    <button class="btn btn-sm so-admin" onclick="document.getElementById('import-dados-input').click()" style="background:rgba(17,32,91,0.08);color:#11205b;font-size:11px;">📥 Importar</button>
     <button class="btn btn-sm" onclick="fazerLogout()" style="background:#dc2626;color:#fff;font-size:11px;">🚪 Sair</button>
 
     </div>
@@ -305,23 +318,23 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
   </div>
   <div class="navbar-divider"></div>
   <div class="navbar-sys">SCO Gente &amp; Gestão</div>
-  <div class="nav-tab active" onclick="goTo('dashboard',this)">📊 Dashboard</div>
-  <div class="nav-tab" onclick="goTo('importacoes',this)">📥 Importações</div>
-  <div class="nav-tab" onclick="goTo('relatorio',this)">📋 Lançamentos</div>
+  <div class="so-admin nav-tab active" onclick="goTo('dashboard',this)">📊 Dashboard</div>
+  <div class="so-admin nav-tab" onclick="goTo('importacoes',this)">📥 Importações</div>
+  <div class="so-admin nav-tab" onclick="goTo('relatorio',this)">📋 Lançamentos</div>
   <div class="nav-tab" onclick="goTo('funcionarios',this)">👥 Funcionários</div>
   <div class="nav-tab" onclick="goTo('ferias-ctrl',this)">🏖️ Férias</div>
   <div class="nav-tab" onclick="goTo('metas',this)">🎯 Metas</div>
   <div class="nav-tab" onclick="goTo('rh',this)">📈 RH</div>
   <div class="nav-tab" onclick="goTo('alertas',this)">🔔 Alertas</div>
-  <div class="nav-tab" onclick="goTo('historico',this)">📜 Histórico</div>
+  <div class="so-admin nav-tab" onclick="goTo('historico',this)">📜 Histórico</div>
   <div class="nav-tab" onclick="goTo('ferias-ctrl',this)" style="display:none">🏖️ Férias2</div>
   <div class="nav-tab" onclick="goTo('perfil-equipe',this)">👥 Perfil da Equipe</div>
-  <div class="nav-tab" onclick="goTo('relatorios',this)">📊 Relatórios</div>
+  <div class="so-admin nav-tab" onclick="goTo('relatorios',this)">📊 Relatórios</div>
   <div class="nav-tab" onclick="goTo('avaliacoes',this)">🌱 Desenvolvimento</div>
   <div style="margin-left:auto;display:flex;gap:6px;align-items:center;padding:0 4px;">
-    <button class="btn btn-sm" onclick="exportarDadosComLog()" style="background:#fff;color:var(--sco-azul);border:1px solid #fff;font-size:11px;font-weight:700;">📤 Exportar dados</button>
+    <button class="btn btn-sm so-admin" onclick="exportarDadosComLog()" style="background:#fff;color:var(--sco-azul);border:1px solid #fff;font-size:11px;font-weight:700;">📤 Exportar dados</button>
     <button class="btn btn-sm" onclick="fazerLogout()" style="background:#dc2626;color:#fff;font-size:11px;">🚪 Sair</button>
-    <button class="btn btn-sm" onclick="document.getElementById('import-dados-input').click()" style="background:var(--sco-laranja);color:#fff;font-size:11px;">📥 Importar dados</button>
+    <button class="btn btn-sm so-admin" onclick="document.getElementById('import-dados-input').click()" style="background:var(--sco-laranja);color:#fff;font-size:11px;">📥 Importar dados</button>
     <input type="file" id="import-dados-input" accept=".json" style="display:none;" onchange="importarDados(this.files[0])">
   </div>
 </div>
@@ -1174,8 +1187,8 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
       <option value="2026" selected>2026</option>
       <option value="2027">2027</option>
     </select>
-    <button class="btn btn-orange" onclick="abrirModalProgramarFerias()">🏖️ Programar Férias</button>
-    <button class="btn btn-primary" onclick="abrirModalNovoPeriodo()" style="background:#3b82f6;">📅 Novo Período</button>
+    <button class="btn btn-orange so-admin" onclick="abrirModalProgramarFerias()">🏖️ Programar Férias</button>
+    <button class="btn btn-primary so-admin" onclick="abrirModalNovoPeriodo()" style="background:#3b82f6;">📅 Novo Período</button>
     <button class="btn btn-sm" onclick="abrirModalRelatorioFerias()" style="background:#16a34a;color:#fff;">📊 Relatório Excel/PDF</button>
   </div>
   <div id="ferias-ctrl-lista"></div>
@@ -1220,8 +1233,8 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
 <div id="page-metas" class="page">
   <div class="page-title">🎯 Controle de Metas</div>
   <div class="page-sub">Registre e acompanhe o percentual de metas atingidas por colaborador</div>
-  <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-outline btn-sm" onclick="importarMetasPlanilha()" style="font-size:12px;">📥 Importar metas jan-mai/2026</button></div>
-  <div class="card">
+  <div class="so-admin" style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="btn btn-outline btn-sm" onclick="importarMetasPlanilha()" style="font-size:12px;">📥 Importar metas jan-mai/2026</button></div>
+  <div class="card so-admin">
     <div class="card-title"><span class="dot"></span>Registrar meta mensal</div>
     <div class="form-grid">
       <div class="form-group"><label>Funcionário *</label><select id="meta-func"><option value="">Selecione...</option></select></div>
@@ -1234,12 +1247,12 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
   </div>
   <div class="filter-bar">
     <select id="meta-filtro-depto" onchange="aplicarSetorMetas()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;border-color:var(--sco-azul);font-weight:600;"><option value="">🏢 Todos os setores</option></select>
-    <select id="meta-filtro-func" onchange="renderMetasTabela()" style="min-width:200px;padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="">Todos os funcionários</option></select>
+    <select id="meta-filtro-func" class="so-admin" onchange="renderMetasTabela()" style="min-width:200px;padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="">Todos os funcionários</option></select>
     <select id="meta-filtro-ano" onchange="renderMetasTabela()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option></select>
     <select id="meta-filtro-periodo" onchange="renderMetasTabela()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;"><option value="anual">📅 Anual</option><option value="s1">1º Semestre</option><option value="s2">2º Semestre</option></select>
   </div>
   <div id="meta-indicadores" class="metrics-grid" style="margin-bottom:14px;"></div>
-  <div style="margin-bottom:14px;">
+  <div class="so-admin" style="margin-bottom:14px;">
     <div class="card">
       <div class="card-title"><span class="dot"></span>📈 Evolução de metas por colaborador</div>
       <div style="margin-bottom:8px;">
@@ -1250,7 +1263,7 @@ body { margin: 0; display: flex; flex-direction: column; height: 100vh; overflow
       <div style="position:relative;height:200px;"><canvas id="chartMetaEvolucao"></canvas></div>
     </div>
   </div>
-  <div class="card">
+  <div class="card so-admin">
     <div class="card-title"><span class="dot"></span>Metas por colaborador</div>
     <div class="table-wrap"><table><thead id="meta-thead"></thead><tbody id="meta-tbody"></tbody></table></div>
     <div class="empty" id="meta-empty" style="display:none">Nenhuma meta registrada.</div>
@@ -1465,6 +1478,10 @@ function fmtData(d){if(!d)return'—';const[y,m,dia]=d.split('-');return dia+'/'
 function getVal(id){const el=document.getElementById(id);return el?parseFloat(el.value)||0:0;}
 
 function goTo(page,el){
+  if(typeof ehAssistente==='function'&&ehAssistente()&&PAGINAS_BLOQUEADAS_ASSISTENTE.indexOf(page)>=0){
+    toast('🔒 Seu perfil não tem acesso a esta área.',false);
+    page='alertas';el=document.querySelector('.nav-tab[onclick*="alertas"]');
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   var pageEl=document.getElementById('page-'+page);
@@ -1479,7 +1496,7 @@ function goTo(page,el){
   if(page==='metas') renderMetas();
   if(page==='perfil-equipe') renderDiversidade();
   if(page==='relatorios') renderRelatorios();
-  if(page==='avaliacoes') renderAvaliacoes();
+  if(page==='avaliacoes'){ renderAvaliacoes(); if(ehAssistente()) switchDevTab('trei'); }
   if(page==='planilha'){document.getElementById('plan-mes').value=new Date().getMonth()+1;}
   if(page==='importar-enc'){encPdfDados={};}
   if(page==='rh') renderRH();
@@ -1547,7 +1564,7 @@ function verFuncionario(id){
   const fi = funcionarios.indexOf(f);
   const campos = [
     ['Tipo contratação', f.tipo],
-    ['Salário base', 'R$ '+Number(f.salario||0).toLocaleString('pt-BR',{minimumFractionDigits:2})],
+    ehAssistente()?null:['Salário base', 'R$ '+Number(f.salario||0).toLocaleString('pt-BR',{minimumFractionDigits:2})],
     ['Nível', f.nivel],
     ['Meta', f.meta],
     ['Data admissão', fmtData(f.admissao)],
@@ -1573,7 +1590,7 @@ function verFuncionario(id){
   document.getElementById('modal-title').innerHTML =
     '<div class="func-info"><div class="avatar" style="background:'+avatarColor(fi2)+';width:32px;height:32px;">'+initials(f.nome)+'</div><div><div>'+f.nome+'</div><div style="font-size:12px;font-weight:400;color:#888">'+f.cargo+'</div></div></div>';
   let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
-  campos.forEach(function([label, val]){
+  campos.filter(Boolean).forEach(function([label, val]){
     if(!val) return;
     html += '<div style="background:#f7f9ff;border-radius:6px;padding:8px 10px;">'
       +'<div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;margin-bottom:2px;">'+label+'</div>'
@@ -1597,7 +1614,11 @@ function verFuncionario(id){
   }
 
   // Histórico salarial do funcionário
-  const histFunc = historico.filter(function(h){return h.funcId===f.id;}).slice(0,5);
+  const histFunc = historico.filter(function(h){
+    if(h.funcId!==f.id) return false;
+    if(ehAssistente() && /sal[aá]rio|R\$/i.test((h.tipo||'')+' '+(h.anterior||'')+' '+(h.novo||''))) return false;
+    return true;
+  }).slice(0,5);
   if(histFunc.length){
     html += '<div style="background:#f7f9ff;border:1px solid #e2e6f0;border-radius:8px;padding:12px;margin-top:12px;">'
       +'<div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;margin-bottom:8px;">📜 Últimas alterações</div>';
@@ -1617,8 +1638,8 @@ function verFuncionario(id){
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
       +'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Data demissão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmtData(f.demissao.data)+'</div></div>'
       +'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Tipo rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+f.demissao.tipo+'</div></div>'
-      +(f.demissao.valor?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Valor rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.valor)+'</div></div>':'')
-      +(f.demissao.fgtsRescisorio?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">FGTS rescisório</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.fgtsRescisorio)+'</div></div>':'')
+      +(f.demissao.valor&&!ehAssistente()?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Valor rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.valor)+'</div></div>':'')
+      +(f.demissao.fgtsRescisorio&&!ehAssistente()?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">FGTS rescisório</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.fgtsRescisorio)+'</div></div>':'')
       +'</div></div>';
   }
   // Botões de checklist e ações
@@ -1627,7 +1648,7 @@ function verFuncionario(id){
     if(funcTemChecklistPendente(f.id)){
       html += '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="closeModal();setTimeout(function(){abrirChecklistPendente(\''+f.id+'\');},200);">⚠️ Ver Checklist Pendente</button>';
     }
-    if(f.ativo===false){
+    if(f.ativo===false && !ehAssistente()){
       html += '<button class="btn btn-sm btn-orange" onclick="closeModal();setTimeout(function(){abrirRescisao(\''+f.id+'\');},200);">💰 Lançar/Editar Rescisão</button>';
     }
     html += '</div>';
@@ -1863,8 +1884,7 @@ function renderFuncionarios(){
       +'<td><code style="background:var(--sco-azul-light);color:var(--sco-azul);padding:2px 6px;border-radius:4px;font-size:11px;">'+fmtData(f.admissao)+'</code></td>'
       +'<td><div style="display:flex;gap:5px;">'
       +'<button class="btn btn-outline btn-sm" onclick="verFuncionario(\''+f.id+'\')">👁️</button>'
-      +'<button class="btn btn-warning btn-sm" onclick="editarFuncionario(\''+f.id+'\')">✏️</button>'
-      +btnStatus
+      +(ehAssistente()?'':'<button class="btn btn-warning btn-sm" onclick="editarFuncionario(\''+f.id+'\')">✏️</button>'+btnStatus)
       +'<button class="btn btn-danger btn-sm" onclick="removeFuncionario(\''+f.id+'\')">🗑️</button>'
       +'</div></td>'
       +'</tr>';
@@ -3291,7 +3311,7 @@ function renderRH(){
     '<div class="metric-card"><div class="metric-label">Colaboradores ativos</div><div class="metric-value">'+totalAtivos+'</div><div class="metric-sub">'+totalInativos+' desligado(s)</div></div>'
     +'<div class="metric-card"><div class="metric-label">Admissões no período</div><div class="metric-value green">'+admissoes.length+'</div><div class="metric-sub">no período selecionado</div></div>'
     +'<div class="metric-card"><div class="metric-label">Desligamentos</div><div class="metric-value orange">'+demissoes.length+'</div><div class="metric-sub">no período selecionado</div></div>'
-    +'<div class="metric-card orange"><div class="metric-label">Custo total desligamentos</div><div class="metric-value orange">'+fmt(custoTotalDem)+'</div><div class="metric-sub">rescisão + FGTS rescisório</div></div>'
+    +'<div class="metric-card orange so-admin"><div class="metric-label">Custo total desligamentos</div><div class="metric-value orange">'+fmt(custoTotalDem)+'</div><div class="metric-sub">rescisão + FGTS rescisório</div></div>'
     +'<div class="metric-card"><div class="metric-label">Turnover (período)</div><div class="metric-value '+(parseFloat(turnover)>5?'orange':'green')+'">'+turnover+'%</div><div class="metric-sub">desligamentos / ativos</div></div>'
     +'<div class="metric-card"><div class="metric-label">Turnover acumulado</div><div class="metric-value '+(parseFloat(turnoverAcum)>5?'orange':'green')+'">'+turnoverAcum+'%</div><div class="metric-sub">(adm+dem) / 2 / ativos</div></div>';
 
@@ -3361,7 +3381,7 @@ function renderRH(){
         +'</tr>';
     }).join('');
     // Linha de total
-    demTbody.innerHTML+='<tr style="background:var(--sco-azul-light);font-weight:700;">'
+    demTbody.innerHTML+='<tr class="rh-total" style="background:var(--sco-azul-light);font-weight:700;">'
       +'<td colspan="4" style="text-align:right;color:var(--sco-azul);padding-right:10px;">Total:</td>'
       +'<td>'+fmt(custoRescisao)+'</td>'
       +'<td>'+fmt(custoFgtsResc)+'</td>'
@@ -3674,7 +3694,7 @@ function renderAlertas(){
     : 999;
 
   const corBackup = diasSemBackup > 7 ? '#dc2626' : diasSemBackup > 3 ? '#f59e0b' : '#16a34a';
-  html += '<div class="card" style="border-left:4px solid '+corBackup+';margin-top:14px;">'
+  html += '<div class="card so-admin" style="border-left:4px solid '+corBackup+';margin-top:14px;">'
     +'<div class="card-title"><span class="dot" style="background:'+corBackup+';"></span>💾 Backup dos dados</div>'
     +'<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
     +'<div>'
@@ -5582,7 +5602,9 @@ function exportarFuncionariosExcel(){
   }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   var nomeFiltro=filtro==='desligados'?'Desligados':filtro==='todos'?'Todos':'Ativos';
   var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status','Data Desligamento']];
+  var _semSal=ehAssistente();
   list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?'Inativo':'Ativo',f.dataDesligamento||'']);});
+  if(_semSal) rows=rows.map(function(r){return r.filter(function(_,i){return i!==5;});});
   var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb,ws,'Funcionarios');XLSX.writeFile(wb,'SCO_Funcionarios_'+nomeFiltro+'.xlsx');
   toast('Excel exportado com '+list.length+' funcionario(s) — '+nomeFiltro+'!');
@@ -5720,6 +5742,7 @@ function saveTreinamentos(){localStorage.setItem('rt_treinamentos',JSON.stringif
 var _treiPartsSelecionados=[];
 
 function switchDevTab(tab){
+  if(ehAssistente()) tab='trei';
   var tabs=['pdi','trei'];
   var subs={'pdi':'dev-sub-pdi','trei':'dev-sub-trei'};
   var btns={'pdi':'dev-tab-pdi','trei':'dev-tab-trei'};
@@ -6412,6 +6435,46 @@ async function loadFromSupabaseSilent(){
 }
 
 
+// ===== PERFIS DE ACESSO =====
+// Acesso total: só os e-mails abaixo. Qualquer outro login entra no perfil "assistente".
+var PERFIL_ACESSO_TOTAL=['sarah@seuclienteoculto.com.br','rh@seuclienteoculto.com.br','bruno@seuclienteoculto.com.br'];
+var _perfilAtual='assistente'; // começa restrito até confirmar o login
+var PAGINAS_BLOQUEADAS_ASSISTENTE=['dashboard','relatorio','lancamento','historico','relatorios','importacoes','planilha','importar-enc','configuracoes'];
+// Ações de escrita bloqueadas para o assistente (abas "só ver" e funções só da coordenação)
+var ACOES_BLOQUEADAS_ASSISTENTE=[
+  'editarFuncionario','salvarEditFunc','desativarFuncionario','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
+  'abrirModalProgramarFerias','salvarProgramacaoFerias','abrirModalNovoPeriodo','salvarNovoPeriodo','abrirModalPagarFerias','salvarPagamentoFerias',
+  'abrirLancarFeriasPeriodo','abrirLancarFerias','confirmarLancarFerias','editarGozo','salvarEditGozo','removerGozo','abrirNovoPeriodo','confirmarNovoPeriodo',
+  'confirmarFerias','cancelarFerias','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
+  'salvarMeta','removerMeta','importarMetasPlanilha',
+  'abrirModalAvaliacao','editarAvaliacao','salvarAvaliacao','excluirAvaliacao','importarAvaliacoesXLSX','importarAvaliacaoXLSX','verDetalhesAvaliacao',
+  'exportarDados','exportarDadosComLog','importarDados','abrirModalLancamento','salvarLancamento','editarLancamento','openModal'
+];
+var _acoesOriginais={};
+function ehAssistente(){return _perfilAtual!=='total';}
+function aplicarPerfil(email){
+  var e=String(email||'').trim().toLowerCase();
+  _perfilAtual=PERFIL_ACESSO_TOTAL.indexOf(e)>=0?'total':'assistente';
+  document.body.classList.toggle('perfil-assistente',_perfilAtual==='assistente');
+  ACOES_BLOQUEADAS_ASSISTENTE.forEach(function(nome){
+    if(!_acoesOriginais[nome]&&typeof window[nome]==='function')_acoesOriginais[nome]=window[nome];
+    if(!_acoesOriginais[nome])return;
+    window[nome]=_perfilAtual==='assistente'
+      ?function(){toast('🔒 Seu perfil não tem permissão para esta ação.',false);}
+      :_acoesOriginais[nome];
+  });
+  if(_perfilAtual==='assistente'){
+    var ativa=document.querySelector('.page.active');
+    var id=ativa?ativa.id.replace('page-',''):'';
+    if(!id||PAGINAS_BLOQUEADAS_ASSISTENTE.indexOf(id)>=0){
+      var item=document.querySelector('.sidebar-item[data-page="alertas"]');
+      sidebarGoTo('alertas',item);
+    }
+    try{switchDevTab('trei');}catch(err){}
+  }
+  try{renderFuncionarios();}catch(err){}
+}
+
 // ===== AUTENTICAÇÃO =====
 async function verificarSessao(){
   try {
@@ -6421,6 +6484,7 @@ async function verificarSessao(){
       document.getElementById('tela-login').style.display='none';
       var user = session.data.session.user;
       console.log('Logado como:', user.email);
+      aplicarPerfil(user.email);
       // Mostrar email do usuário na navbar se houver elemento
       var elUser = document.getElementById('nav-user-email');
       if(elUser) elUser.textContent = user.email;
@@ -6452,6 +6516,7 @@ async function fazerLogin(){
   
   try {
     var result = await supa.auth.signInWithPassword({email:email, password:senha});
+    if(!result.error){ aplicarPerfil((result.data&&result.data.user&&result.data.user.email)||email); }
     if(result.error){
       erro.textContent='E-mail ou senha incorretos.';
       erro.style.display='block';
@@ -6474,6 +6539,7 @@ async function fazerLogin(){
 
 async function fazerLogout(){
   await supa.auth.signOut({scope:'global'});
+  aplicarPerfil('');
   document.getElementById('tela-login').style.display='flex';
   document.getElementById('login-email').value='';
   document.getElementById('login-senha').value='';
@@ -7723,7 +7789,7 @@ setTimeout(function(){
   <div class="page-sub">Avaliações de desempenho, PDI e desenvolvimento dos colaboradores</div>
   <!-- Tabs PDI / Treinamentos -->
   <div style="display:flex;border-bottom:2px solid #e2e6f0;margin-bottom:20px;gap:0;">
-    <button id="dev-tab-pdi" onclick="switchDevTab('pdi')" style="padding:10px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--sco-azul);border-bottom:3px solid var(--sco-laranja);margin-bottom:-2px;">📋 Avaliações / PDI</button>
+    <button id="dev-tab-pdi" class="so-admin" onclick="switchDevTab('pdi')" style="padding:10px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--sco-azul);border-bottom:3px solid var(--sco-laranja);margin-bottom:-2px;">📋 Avaliações / PDI</button>
     <button id="dev-tab-trei" onclick="switchDevTab('trei')" style="padding:10px 18px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#888;border-bottom:3px solid transparent;margin-bottom:-2px;">🎓 Treinamentos</button>
   </div>
   <div id="dev-sub-pdi">
