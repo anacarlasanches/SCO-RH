@@ -429,6 +429,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
     </div>
     <div id="checklist-lista" style="flex:1;overflow-y:auto;padding:8px 12px;"></div>
     <div style="padding:12px 20px;border-top:1px solid #e2e6f0;display:flex;gap:8px;">
+      <button id="ck-btn-docs" class="btn btn-orange" onclick="if(_checklistAtual)gerarDocumentosAdmissao(_checklistAtual.funcId)" style="flex:1;display:none;">📄 Gerar documentos de admissão</button>
       <button class="btn btn-outline" onclick="fecharChecklist()" style="flex:1;">Fechar</button>
     </div>
   </div>
@@ -1641,6 +1642,10 @@ function verFuncionario(id){
       +(f.demissao.valor&&!ehAssistente()?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Valor rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.valor)+'</div></div>':'')
       +(f.demissao.fgtsRescisorio&&!ehAssistente()?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">FGTS rescisório</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.fgtsRescisorio)+'</div></div>':'')
       +'</div></div>';
+  }
+  // Documentos de admissão (CLT ativo)
+  if(f.ativo!==false && _ehCLT(f)){
+    html += '<div style="margin-top:12px;"><button class="btn btn-sm btn-orange" onclick="gerarDocumentosAdmissao(\''+f.id+'\')">📄 Gerar documentos de admissão</button></div>';
   }
   // Botões de checklist e ações
   if(funcTemChecklistPendente(f.id) || f.ativo===false){
@@ -3587,6 +3592,87 @@ async function gerarAvaliacaoExp(funcId,tipo){
   }catch(e){
     if(e&&e.message==='cancelado')return;
     console.error(e);toast('Erro ao gerar a avaliação: '+e.message,false);
+  }
+}
+
+// ===== DOCUMENTOS DE ADMISSÃO (CLT) =====
+// Modelo Word em /modelos com os campos {{NOME}}, {{CPF}}, {{ESTADO_CIVIL}} e {{DATA_EXTENSO}}.
+var DOC_ADMISSAO_MODELO='modelos/documentos_admissao_clt.docx';
+var _docAdmCache=null;
+var MESES_EXTENSO=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function _ehCLT(f){return (f.tipo||'CLT').toUpperCase()==='CLT';}
+function _estadoCivilDoc(v){
+  var t=String(v||'').trim().toLowerCase();
+  if(!t)return '______________';
+  if(/\(a\)|\(o\)/.test(t))return t;
+  if(/[ao]$/.test(t)) return t.replace(/[ao]$/,'')+'o(a)';
+  return t;
+}
+function _modeloAdmissaoValido(buf){
+  try{
+    var cfb=XLSX.CFB.read(new Uint8Array(buf),{type:'array'});
+    var ent=XLSX.CFB.find(cfb,'/word/document.xml');
+    return !!ent && new TextDecoder('utf-8').decode(ent.content).indexOf('{{NOME}}')>=0;
+  }catch(e){return false;}
+}
+async function _carregarModeloAdmissao(){
+  if(_docAdmCache)return _docAdmCache;
+  var buf=null;
+  try{
+    var r=await fetch(DOC_ADMISSAO_MODELO,{cache:'no-cache'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    buf=await r.arrayBuffer();
+    if(!_modeloAdmissaoValido(buf))buf=null;
+  }catch(e){buf=null;}
+  var msg='Não consegui abrir o modelo dos documentos de admissão automaticamente.\n\nClique em OK e selecione o arquivo "Modelo_Documentos_Admissao_CLT.docx".';
+  while(!buf){
+    buf=await new Promise(function(res,rej){
+      if(!confirm(msg))return rej(new Error('cancelado'));
+      var inp=document.createElement('input');inp.type='file';inp.accept='.docx';
+      inp.onchange=function(){var f=inp.files[0];if(!f)return rej(new Error('cancelado'));f.arrayBuffer().then(res,rej);};
+      inp.click();
+    });
+    if(!_modeloAdmissaoValido(buf)){
+      buf=null;
+      msg='⚠️ Esse arquivo não é o modelo com campos automáticos (parece um documento já preenchido).\n\nClique em OK e selecione o arquivo "Modelo_Documentos_Admissao_CLT.docx".';
+    }
+  }
+  _docAdmCache=buf;
+  return _docAdmCache;
+}
+async function gerarDocumentosAdmissao(funcId){
+  var f=funcionarios.find(function(x){return x.id===funcId;});
+  if(!f){toast('Funcionário não encontrado.',false);return;}
+  if(!_ehCLT(f)){toast('Os documentos de admissão são só para CLT.',false);return;}
+  if(typeof XLSX==='undefined'||!XLSX.CFB){toast('Aguarde o sistema carregar e tente de novo.',false);return;}
+  var dt=_dataLocal(f.admissao)||new Date();
+  var vazios=[];
+  var cpf=String(f.cpf||'').trim(); if(!cpf){cpf='___.___.___-__';vazios.push('CPF');}
+  if(!String(f.est_civil||'').trim())vazios.push('estado civil');
+  var valores={
+    NOME:String(f.nome||'').trim(),
+    CPF:cpf,
+    ESTADO_CIVIL:_estadoCivilDoc(f.est_civil),
+    DATA_EXTENSO:dt.getDate()+' de '+MESES_EXTENSO[dt.getMonth()]+' de '+dt.getFullYear()
+  };
+  try{
+    var buf=await _carregarModeloAdmissao();
+    var cfb=XLSX.CFB.read(new Uint8Array(buf),{type:'array'});
+    var ent=XLSX.CFB.find(cfb,'/word/document.xml');
+    if(!ent)throw new Error('Documento não encontrado no modelo');
+    var xml=new TextDecoder('utf-8').decode(ent.content);
+    Object.keys(valores).forEach(function(k){xml=xml.split('{{'+k+'}}').join(_xmlEsc(valores[k]));});
+    ent.content=new TextEncoder().encode(xml);ent.size=ent.content.length;
+    var out=XLSX.CFB.write(cfb,{fileType:'zip',type:'array'});
+    var blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    var nomeArq='Documentos_Admissao_'+valores.NOME.replace(/\s+/g,'_').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9_]/g,'')+'.docx';
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nomeArq;
+    document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);
+    toast('📄 Documentos de admissão gerados'+(vazios.length?' — em branco: '+vazios.join(' e ')+' (complete o cadastro)':'!'),!vazios.length);
+  }catch(e){
+    if(e&&e.message==='cancelado')return;
+    console.error(e);toast('Erro ao gerar os documentos: '+e.message,false);
   }
 }
 
@@ -6805,6 +6891,8 @@ function renderChecklist(titulo, subtitulo){
   document.getElementById('checklist-subtitulo').textContent = subtitulo;
   var lista = document.getElementById('checklist-lista');
   lista.innerHTML = '';
+  var btnDocs = document.getElementById('ck-btn-docs');
+  if(btnDocs) btnDocs.style.display = (_checklistAtual && _checklistAtual.tipo==='admissao_CLT') ? '' : 'none';
   if(!_checklistAtual) return;
   _checklistAtual.items.forEach(function(item, i){
     var div = document.createElement('div');
