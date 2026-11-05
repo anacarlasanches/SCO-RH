@@ -1101,7 +1101,28 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       <h3 style="margin:0;color:#11205b;font-size:16px;">📊 Relatório de Férias</h3>
       <button onclick="fecharModalRelatorioFerias()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
     </div>
-    <div class="form-grid">
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>Tipo de relatório</label>
+      <select id="rel-fer-tipo" onchange="alternarTipoRelFerias()" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;font-weight:600;">
+        <option value="programadas">🏖️ Férias programadas (por mês)</option>
+        <option value="abertos">📋 Períodos em aberto (saldo e vencimento)</option>
+      </select>
+    </div>
+    <div id="rel-fer-abertos-filtros" class="form-grid" style="display:none;">
+      <div class="form-group">
+        <label>Setor</label>
+        <select id="rel-fer-depto" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;"><option value="">Todos os setores</option></select>
+      </div>
+      <div class="form-group">
+        <label>Situação</label>
+        <select id="rel-fer-situacao" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;">
+          <option value="">Todos os períodos em aberto</option>
+          <option value="vencido">Só vencidos</option>
+          <option value="60">Vencidos + vencem em até 60 dias</option>
+        </select>
+      </div>
+    </div>
+    <div id="rel-fer-prog-filtros" class="form-grid">
       <div class="form-group">
         <label>Mês</label>
         <select id="rel-fer-mes" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;">
@@ -1125,8 +1146,8 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px;">
-      <button class="btn btn-orange" onclick="gerarRelatorioFeriasExcel()" style="flex:1;">📥 Exportar Excel</button>
-      <button class="btn btn-primary" onclick="gerarRelatorioFeriasPDF()" style="flex:1;background:#11205b;">🖨️ Exportar PDF</button>
+      <button class="btn btn-orange" onclick="relFeriasExcel()" style="flex:1;">📥 Exportar Excel</button>
+      <button class="btn btn-primary" onclick="relFeriasPDF()" style="flex:1;background:#11205b;">🖨️ Exportar PDF</button>
     </div>
   </div>
 </div>
@@ -6657,11 +6678,98 @@ function sidebarGoTo(page, el){
 
 function abrirModalRelatorioFerias(){
   document.getElementById('modal-relatorio-ferias').style.display='flex';
+  try{alternarTipoRelFerias();}catch(e){}
   var mesAtual = new Date().getMonth()+1;
   document.getElementById('rel-fer-mes').value = mesAtual;
 }
 function fecharModalRelatorioFerias(){
   document.getElementById('modal-relatorio-ferias').style.display='none';
+}
+
+// ===== RELATÓRIO: PERÍODOS DE FÉRIAS EM ABERTO =====
+function alternarTipoRelFerias(){
+  var t=(document.getElementById('rel-fer-tipo')||{value:'programadas'}).value;
+  document.getElementById('rel-fer-abertos-filtros').style.display=t==='abertos'?'':'none';
+  document.getElementById('rel-fer-prog-filtros').style.display=t==='abertos'?'none':'';
+  if(t==='abertos'){
+    var sel=document.getElementById('rel-fer-depto');var cur=sel.value;
+    var deptos=[...new Set(funcionarios.filter(function(f){return f.ativo!==false;}).map(function(f){return f.depto;}).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">Todos os setores</option>'+deptos.map(function(d){return '<option value="'+d+'"'+(d===cur?' selected':'')+'>'+d+'</option>';}).join('');
+  }
+}
+function relFeriasExcel(){
+  if((document.getElementById('rel-fer-tipo')||{}).value==='abertos')gerarRelPeriodosAbertosExcel();else gerarRelatorioFeriasExcel();
+}
+function relFeriasPDF(){
+  if((document.getElementById('rel-fer-tipo')||{}).value==='abertos')gerarRelPeriodosAbertosPDF();else gerarRelatorioFeriasPDF();
+}
+function getDadosPeriodosAbertos(){
+  var dep=(document.getElementById('rel-fer-depto')||{value:''}).value;
+  var sit=(document.getElementById('rel-fer-situacao')||{value:''}).value;
+  var h=new Date();var hoje=new Date(h.getFullYear(),h.getMonth(),h.getDate());
+  var linhas=[];
+  funcionarios.filter(function(f){return f.ativo!==false&&(!dep||f.depto===dep);}).forEach(function(f){
+    getFuncPeriodos(f).forEach(function(p){
+      var saldo=getSaldoPeriodo(p);
+      if(saldo<=0)return;
+      var direito=p.saldoInicial||30;
+      var vn=_dataLocal(p.vencimento);
+      var dv=vn?Math.round((vn-hoje)/864e5):null;
+      var situacao=dv===null?'Sem vencimento':dv<0?'Vencido':dv<=30?'Vence em até 30 dias':dv<=60?'Vence em até 60 dias':'No prazo';
+      if(sit==='vencido'&&!(dv!==null&&dv<0))return;
+      if(sit==='60'&&!(dv!==null&&dv<=60))return;
+      linhas.push({nome:f.nome,cargo:f.cargo||'',setor:f.depto||'',inicio:p.inicio||'',fim:p.fim||'',vencimento:p.vencimento||'',
+        direito:direito,gozados:direito-saldo,saldo:saldo,dias:dv,situacao:situacao});
+    });
+  });
+  // Mais urgentes primeiro
+  linhas.sort(function(a,b){
+    var x=a.dias===null?1e9:a.dias,y=b.dias===null?1e9:b.dias;
+    return x-y||a.nome.localeCompare(b.nome,'pt-BR');
+  });
+  return linhas;
+}
+function _txtDiasVenc(d){return d===null?'—':d<0?'Vencido há '+(-d)+' dia(s)':d===0?'Vence hoje':d+' dia(s)';}
+function gerarRelPeriodosAbertosExcel(){
+  if(typeof XLSX==='undefined'){toast('Aguarde o sistema carregar.',false);return;}
+  var dados=getDadosPeriodosAbertos();
+  if(!dados.length){toast('Nenhum período em aberto para o filtro selecionado.',false);return;}
+  var rows=[['Colaborador','Cargo','Setor','Período aquisitivo — início','Período aquisitivo — fim','Dias de direito','Dias gozados','Saldo (dias)','Vencimento','Dias para vencer','Situação']];
+  dados.forEach(function(l){rows.push([l.nome,l.cargo,l.setor,fmtData(l.inicio),fmtData(l.fim),l.direito,l.gozados,l.saldo,fmtData(l.vencimento),l.dias===null?'':l.dias,l.situacao]);});
+  rows.push([]);
+  rows.push(['Total de períodos em aberto',dados.length,'','','','','','Saldo total (dias)',dados.reduce(function(a,l){return a+l.saldo;},0)]);
+  rows.push(['Gerado em',new Date().toLocaleDateString('pt-BR')]);
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:32},{wch:24},{wch:16},{wch:14},{wch:14},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12},{wch:22}];
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Períodos em aberto');
+  var dep=(document.getElementById('rel-fer-depto')||{value:''}).value;
+  XLSX.writeFile(wb,'Ferias_Periodos_em_Aberto'+(dep?'_'+dep.replace(/\s+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  fecharModalRelatorioFerias();
+  toast('✅ Relatório exportado — '+dados.length+' período(s) em aberto');
+}
+function gerarRelPeriodosAbertosPDF(){
+  var dados=getDadosPeriodosAbertos();
+  if(!dados.length){toast('Nenhum período em aberto para o filtro selecionado.',false);return;}
+  var dep=(document.getElementById('rel-fer-depto')||{value:''}).value;
+  var cores={'Vencido':'#dc2626','Vence em até 30 dias':'#ea580c','Vence em até 60 dias':'#ca8a04','No prazo':'#16a34a','Sem vencimento':'#888'};
+  var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;');};
+  var linhas=dados.map(function(l){
+    return '<tr><td>'+esc(l.nome)+'</td><td>'+esc(l.cargo)+'</td><td>'+esc(l.setor)+'</td><td>'+fmtData(l.inicio)+' a '+fmtData(l.fim)+'</td>'
+      +'<td style="text-align:center;">'+l.direito+'</td><td style="text-align:center;">'+l.gozados+'</td><td style="text-align:center;font-weight:700;">'+l.saldo+'</td>'
+      +'<td>'+fmtData(l.vencimento)+'</td><td>'+_txtDiasVenc(l.dias)+'</td>'
+      +'<td><span style="color:'+cores[l.situacao]+';font-weight:700;">'+l.situacao+'</span></td></tr>';
+  }).join('');
+  var cont={};dados.forEach(function(l){cont[l.situacao]=(cont[l.situacao]||0)+1;});
+  var resumo=Object.keys(cores).filter(function(k){return cont[k];}).map(function(k){return '<span style="color:'+cores[k]+';font-weight:700;">'+k+': '+cont[k]+'</span>';}).join(' &nbsp;·&nbsp; ');
+  var titulo='Férias — Períodos em Aberto'+(dep?' — '+esc(dep):'');
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}h2{color:#11205b;font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{background:#11205b;color:#fff;padding:6px 8px;text-align:left;font-size:10px;}td{padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;}tr:nth-child(even){background:#f8f9ff;}@media print{button{display:none;}}</style></head><body>';
+  html+='<h2>'+titulo+'</h2><div style="color:#666;font-size:10px;">Gerado em '+new Date().toLocaleDateString('pt-BR')+' — '+dados.length+' período(s) em aberto — saldo total: '+dados.reduce(function(a,l){return a+l.saldo;},0)+' dia(s)</div>';
+  html+='<div style="margin-top:6px;font-size:11px;">'+resumo+'</div>';
+  html+='<table><thead><tr><th>Colaborador</th><th>Cargo</th><th>Setor</th><th>Período aquisitivo</th><th>Direito</th><th>Gozados</th><th>Saldo</th><th>Vencimento</th><th>Prazo</th><th>Situação</th></tr></thead><tbody>'+linhas+'</tbody></table>';
+  html+='<br><button onclick="window.print()" style="background:#11205b;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button></body></html>';
+  var win=window.open('','_blank');
+  if(win){win.document.write(html);win.document.close();}
+  fecharModalRelatorioFerias();
 }
 
 function getDadosRelatorioFerias(){
