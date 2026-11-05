@@ -1106,6 +1106,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       <select id="rel-fer-tipo" onchange="alternarTipoRelFerias()" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;font-weight:600;">
         <option value="programadas">🏖️ Férias programadas (por mês)</option>
         <option value="abertos">📋 Períodos em aberto (saldo e vencimento)</option>
+        <option value="semgozo">🔎 Períodos encerrados sem nenhum gozo</option>
       </select>
     </div>
     <div id="rel-fer-abertos-filtros" class="form-grid" style="display:none;">
@@ -1213,6 +1214,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
     <button class="btn btn-primary so-admin" onclick="abrirModalNovoPeriodo()" style="background:#3b82f6;">📅 Novo Período</button>
     <button class="btn btn-sm" onclick="abrirModalRelatorioFerias()" style="background:#16a34a;color:#fff;">📊 Relatório Excel/PDF</button>
   </div>
+  <div id="fer-aviso-sem-periodo"></div>
   <div id="ferias-ctrl-lista"></div>
 </div>
 
@@ -1572,7 +1574,9 @@ function addFuncionario(){
   const depto=document.getElementById('f-depto').value,adm=document.getElementById('f-admissao').value;
   if(!nome||!cargo){toast('Preencha nome e cargo',false);return;}
   funcionarios.push({id:'f_'+Date.now(),nome,cargo,depto,admissao:adm||''});
+  var _abriuPeriodo=abrirPrimeiroPeriodo(funcionarios[funcionarios.length-1]);
   save();renderFuncionarios();
+  if(_abriuPeriodo) setTimeout(function(){toast('🏖️ 1º período aquisitivo aberto automaticamente');},1800);
   ['f-nome','f-cargo'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-admissao').value='';
   toast('Funcionário cadastrado!');
@@ -3027,6 +3031,14 @@ document.addEventListener('change', function(e){
 // ===== EXPORTAR / IMPORTAR DADOS =====
 }
 
+// Download direto de arquivo (mesmo método dos documentos de admissão)
+function baixarArquivo(blob,nomeArq){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download=nomeArq;a.style.display='none';
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(url);a.remove();},4000);
+}
 function exportarDados(){
   var dados={
     funcionarios:funcionarios,lancamentos:lancamentos,departamentos:departamentos,
@@ -3036,35 +3048,8 @@ function exportarDados(){
   var json=JSON.stringify(dados,null,2);
   var hoje=new Date();
   var nomeArq='SCO_Dados_'+hoje.getFullYear()+String(hoje.getMonth()+1).padStart(2,'0')+String(hoje.getDate()).padStart(2,'0')+'.json';
-  var win=window.open('','_blank','width=820,height=640');
-  var doc=win.document;
-  doc.open();
-  doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Exportar Dados</title>');
-  doc.write('<style>body{font-family:sans-serif;margin:0;background:#1e1e1e;color:#d4d4d4;}');
-  doc.write('#top{background:#252526;padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #444;}');
-  doc.write('h3{margin:0;color:#fff;font-size:14px;}');
-  doc.write('.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;}');
-  doc.write('.btn-blue{background:#0ea5e9;color:#fff;}.btn-green{background:#16a34a;color:#fff;}');
-  doc.write('#msg{color:#4ade80;font-size:12px;margin-left:8px;}');
-  doc.write('textarea{width:100%;height:calc(100vh - 62px);background:#1e1e1e;color:#d4d4d4;border:none;padding:16px;box-sizing:border-box;font-family:monospace;font-size:11px;resize:none;outline:none;}');
-  doc.write('</style></head><body>');
-  doc.write('<div id="top">');
-  doc.write('<h3>&#x1F4BE; '+nomeArq+'</h3>');
-  doc.write('<button class="btn btn-blue" onclick="copiar()">&#x1F4CB; Copiar tudo</button>');
-  doc.write('<button class="btn btn-green" onclick="baixar()">&#x2B07;&#xFE0F; Baixar .json</button>');
-  doc.write('<span id="msg"></span>');
-  doc.write('<small style="color:#888;margin-left:auto;">Se baixar não funcionar: copie tudo e salve como .json no bloco de notas</small>');
-  doc.write('</div>');
-  doc.write('<textarea id="ta" readonly></textarea>');
-  doc.write('<script>');
-  doc.write('var j='+JSON.stringify(json)+';');
-  doc.write('document.getElementById("ta").value=j;');
-  doc.write('function copiar(){navigator.clipboard.writeText(j).then(function(){document.getElementById("msg").textContent="Copiado!";});}');
-  doc.write('function baixar(){var b=new Blob([j],{type:"application/json"});var u=URL.createObjectURL(b);var a=document.createElement("a");a.href=u;a.download="'+nomeArq+'";a.click();}');
-  doc.write('<\/script>');
-  doc.write('</body></html>');
-  doc.close();
-  toast('Janela aberta! Clique em Baixar .json para salvar.');
+  baixarArquivo(new Blob([json],{type:'application/json'}),nomeArq);
+  toast('💾 Backup baixado: '+nomeArq);
 }
 
 function importarDados(file){
@@ -4111,13 +4096,8 @@ function abrirNovoPeriodo(funcId){
       vencSug=dv.toISOString().split('T')[0];
     }
   } else if(f.admissao){
-    const adm=new Date(f.admissao);
-    const d1=new Date(adm);d1.setFullYear(d1.getFullYear()+1);
-    inicioSug=d1.toISOString().split('T')[0];
-    const d2=new Date(d1);d2.setFullYear(d2.getFullYear()+1);d2.setDate(d2.getDate()-1);
-    fimSug=d2.toISOString().split('T')[0];
-    const d3=new Date(d2);d3.setFullYear(d3.getFullYear()+1);
-    vencSug=d3.toISOString().split('T')[0];
+    const admL=_dataLocal(f.admissao);
+    if(admL){const pp=_periodoDesde(admL,f.id);inicioSug=pp.inicio;fimSug=pp.fim;vencSug=pp.vencimento;}
   }
   document.getElementById('np-inicio').value=inicioSug;
   document.getElementById('np-fim').value=fimSug;
@@ -4146,9 +4126,126 @@ function fecharNovoPeriodo(){
 
 
 let ferFuncId = null;
+// ===== PERÍODOS AQUISITIVOS AUTOMÁTICOS (CLT) =====
+// Regra: 1º período começa na admissão; cada período dura 12 meses; vencimento = 12 meses após o fim.
+// O próximo período abre sozinho no dia seguinte ao fim do anterior (mesmo que o anterior ainda tenha saldo).
+// Funcionários SEM nenhum período não recebem nada automático — ficam listados para análise.
+function _isoLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _somaAnos(d,n){var x=new Date(d.getFullYear()+n,d.getMonth(),d.getDate());if(x.getMonth()!==d.getMonth())x.setDate(0);return x;}
+function _periodoDesde(inicio,fid){
+  var fim=_somaAnos(inicio,1);fim.setDate(fim.getDate()-1);
+  var venc=_somaAnos(fim,1);
+  var ini=_isoLocal(inicio);
+  return {id:'p_auto_'+fid+'_'+ini,inicio:ini,fim:_isoLocal(fim),vencimento:_isoLocal(venc),saldoInicial:30,gozos:[],auto:true};
+}
+function _ehCLTAtivo(f){return f&&f.ativo!==false&&(f.tipo||'CLT').toUpperCase()==='CLT';}
+// Abre o 1º período de um CLT recém-cadastrado
+function abrirPrimeiroPeriodo(f){
+  if(!_ehCLTAtivo(f))return false;
+  var adm=_dataLocal(f.admissao);
+  if(!adm)return false;
+  var ps=getFuncPeriodos(f);
+  if(ps.length)return false;
+  ps.push(_periodoDesde(adm,f.id));
+  return true;
+}
+// Abre os períodos seguintes de quem já tem período, até chegar no período que está correndo hoje
+function garantirPeriodosAutomaticos(){
+  var h=new Date();var hoje=new Date(h.getFullYear(),h.getMonth(),h.getDate());
+  var alterados=[];
+  funcionarios.forEach(function(f){
+    if(!_ehCLTAtivo(f)||!f.periodos||!f.periodos.length)return;
+    var novos=0;
+    while(novos<5){
+      var ultimo=f.periodos.reduce(function(a,p){return (!a||(p.fim||'')>(a.fim||''))?p:a;},null);
+      var fimUlt=ultimo&&_dataLocal(ultimo.fim);
+      if(!fimUlt||fimUlt>=hoje)break;
+      var ini=new Date(fimUlt);ini.setDate(ini.getDate()+1);
+      var np=_periodoDesde(ini,f.id);
+      if(f.periodos.some(function(p){return p.inicio===np.inicio;}))break;
+      f.periodos.push(np);novos++;
+    }
+    if(novos)alterados.push(f);
+  });
+  if(alterados.length){
+    try{localStorage.setItem('rt_funcs',JSON.stringify(funcionarios));}catch(e){}
+    try{supa.from('funcionarios').upsert(alterados.map(function(f){return {id:f.id,dados:f};})).then(function(r){if(r&&r.error)console.warn('Períodos automáticos: erro ao salvar',r.error);});}catch(e){}
+    console.log('✅ Períodos aquisitivos abertos automaticamente para '+alterados.length+' funcionário(s)');
+    try{renderFeriasCtrl();}catch(e){}
+  }
+  return alterados.length;
+}
+function _previaPeriodos(f){
+  // Quantos períodos seriam abertos (da admissão até o período que está correndo hoje)
+  var adm=_dataLocal(f.admissao);if(!adm)return [];
+  var h=new Date();var hoje=new Date(h.getFullYear(),h.getMonth(),h.getDate());
+  var lista=[_periodoDesde(adm,f.id)];
+  while(lista.length<40){
+    var ult=_dataLocal(lista[lista.length-1].fim);
+    if(ult>=hoje)break;
+    var ini=new Date(ult);ini.setDate(ini.getDate()+1);
+    lista.push(_periodoDesde(ini,f.id));
+  }
+  return lista;
+}
+function renderAvisoSemPeriodo(){
+  var el=document.getElementById('fer-aviso-sem-periodo');if(!el)return;
+  var lista=funcionarios.filter(function(f){return _ehCLTAtivo(f)&&!(f.periodos&&f.periodos.length);})
+    .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+  if(!lista.length){el.innerHTML='';return;}
+  var h=new Date();var umAnoAtras=new Date(h.getFullYear()-1,h.getMonth(),h.getDate());
+  var podeAbrir=!ehAssistente();
+  el.innerHTML='<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:14px;">'
+    +'<div class="card-title"><span class="dot" style="background:#f59e0b;"></span>⚠️ CLT ativos sem período aquisitivo — '+lista.length+' funcionário(s)</div>'
+    +'<div style="font-size:12px;color:#666;margin-bottom:8px;">'+(podeAbrir
+      ?'Marque quem deve ter os períodos abertos a partir da admissão (já vêm marcados os admitidos há menos de 1 ano) e clique no botão. Depois disso, os próximos períodos abrem sozinhos.'
+      :'Os períodos destes funcionários precisam ser abertos pela coordenação.')+'</div>'
+    +'<div class="table-wrap"><table><thead><tr>'+(podeAbrir?'<th style="width:30px;"><input type="checkbox" id="sp-todos" onchange="document.querySelectorAll(\'.sp-ck:not(:disabled)\').forEach(function(c){c.checked=this.checked;}.bind(this))"/></th>':'')
+    +'<th>Funcionário</th><th>Cargo</th><th>Setor</th><th>Admissão</th>'+(podeAbrir?'<th>Será aberto</th>':'')+'</tr></thead><tbody>'
+    +lista.map(function(f){
+      var adm=_dataLocal(f.admissao);
+      var prev=_previaPeriodos(f);
+      var recente=adm&&adm>=umAnoAtras;
+      var desc=!prev.length?'<span style="color:#dc2626;">sem data de admissão</span>'
+        :prev.length===1?'1 período: '+fmtData(prev[0].inicio)+' a '+fmtData(prev[0].fim)
+        :'<span style="color:#c2410c;font-weight:600;">'+prev.length+' períodos</span> ('+fmtData(prev[0].inicio)+' até '+fmtData(prev[prev.length-1].fim)+')';
+      return '<tr>'+(podeAbrir?'<td><input type="checkbox" class="sp-ck" value="'+f.id+'"'+(prev.length?'':' disabled')+(recente?' checked':'')+'/></td>':'')
+        +'<td><strong>'+f.nome+'</strong></td><td>'+(f.cargo||'')+'</td><td>'+(f.depto||'—')+'</td>'
+        +'<td>'+(f.admissao?fmtData(f.admissao):'<span style="color:#dc2626;">sem data</span>')+'</td>'
+        +(podeAbrir?'<td style="font-size:12px;">'+desc+'</td>':'')+'</tr>';
+    }).join('')
+    +'</tbody></table></div>'
+    +(podeAbrir?'<div style="margin-top:10px;"><button class="btn btn-orange btn-sm" onclick="abrirPeriodosSelecionados()">🏖️ Abrir períodos dos selecionados</button>'
+      +'<span style="font-size:11px;color:#888;margin-left:8px;">Cada período aberto começa com saldo de 30 dias. Se alguém já gozou férias fora do sistema, lance o gozo depois.</span></div>':'')
+    +'</div>';
+}
+function abrirPeriodosSelecionados(){
+  if(ehAssistente()){toast('🔒 Seu perfil não tem permissão para esta ação.',false);return;}
+  var ids=[].slice.call(document.querySelectorAll('.sp-ck:checked')).map(function(c){return c.value;});
+  if(!ids.length){toast('Marque ao menos um funcionário.',false);return;}
+  var fs=ids.map(function(id){return funcionarios.find(function(x){return x.id===id;});}).filter(Boolean);
+  var resumo=fs.map(function(f){var n=_previaPeriodos(f).length;return '• '+f.nome+' — '+n+' período(s)';}).join('\n');
+  var multi=fs.filter(function(f){return _previaPeriodos(f).length>1;}).length;
+  if(!confirm('Abrir os períodos aquisitivos a partir da admissão para:\n\n'+resumo+(multi?'\n\n⚠️ '+multi+' funcionário(s) vão receber mais de 1 período (admitidos há mais de 1 ano). Cada um começa com 30 dias de saldo.':'')+'\n\nConfirma?'))return;
+  var total=0;
+  fs.forEach(function(f){
+    if(f.periodos&&f.periodos.length)return;
+    var prev=_previaPeriodos(f);
+    if(!prev.length)return;
+    f.periodos=prev;total+=prev.length;
+  });
+  try{localStorage.setItem('rt_funcs',JSON.stringify(funcionarios));}catch(e){}
+  supa.from('funcionarios').upsert(fs.map(function(f){return {id:f.id,dados:f};})).then(function(r){
+    if(r&&r.error){console.warn(r.error);toast('⚠️ Períodos abertos neste navegador, mas não salvos na nuvem. Tente de novo.',false);}
+  });
+  renderFeriasCtrl();
+  toast('✅ '+total+' período(s) aberto(s) para '+fs.length+' funcionário(s)!');
+}
+
 function getFuncPeriodos(f){if(!f.periodos)f.periodos=[];if(f.ferias&&f.ferias.diasSaldo>0&&f.periodos.length===0){f.periodos.push({id:'p_'+Date.now(),inicio:f.ferias.periodoInicio||'',fim:f.ferias.periodoFim||'',vencimento:f.ferias.vencimento||'',saldoInicial:f.ferias.diasSaldo||30,gozos:[]});}return f.periodos;}
 function getSaldoPeriodo(p){var g=(p.gozos||[]).reduce(function(a,b){return a+(b.diasGozo||0);},0);return(p.saldoInicial||30)-g;}
 function renderFeriasCtrl(){
+  try{renderAvisoSemPeriodo();}catch(e){}
   var busca=(document.getElementById('fer-busca')||{value:''}).value.toLowerCase();
   var fs=(document.getElementById('fer-filtro-status')||{value:''}).value;
   var mesProg=parseInt((document.getElementById('fer-mes-prog')||{value:''}).value)||0;
@@ -6425,6 +6522,8 @@ async function loadFromSupabase(){
       localStorage.setItem('rt_deptos', JSON.stringify(departamentos));
     }
     
+    // Abrir automaticamente os próximos períodos aquisitivos (CLT)
+    try{garantirPeriodosAutomaticos();}catch(e){console.warn('Períodos automáticos:',e);}
     // Re-renderizar tudo
     try{renderDashboard();}catch(e){}
     try{renderFuncionarios();}catch(e){}
@@ -6552,7 +6651,7 @@ var ACOES_BLOQUEADAS_ASSISTENTE=[
   'editarFuncionario','salvarEditFunc','desativarFuncionario','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
   'abrirModalProgramarFerias','salvarProgramacaoFerias','abrirModalNovoPeriodo','salvarNovoPeriodo','abrirModalPagarFerias','salvarPagamentoFerias',
   'abrirLancarFeriasPeriodo','abrirLancarFerias','confirmarLancarFerias','editarGozo','salvarEditGozo','removerGozo','abrirNovoPeriodo','confirmarNovoPeriodo',
-  'confirmarFerias','cancelarFerias','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
+  'confirmarFerias','cancelarFerias','abrirPeriodosSelecionados','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
   'salvarMeta','removerMeta','importarMetasPlanilha',
   'abrirModalAvaliacao','editarAvaliacao','salvarAvaliacao','excluirAvaliacao','importarAvaliacoesXLSX','importarAvaliacaoXLSX','verDetalhesAvaliacao',
   'exportarDados','exportarDadosComLog','importarDados','abrirModalLancamento','salvarLancamento','editarLancamento','openModal'
@@ -6689,19 +6788,23 @@ function fecharModalRelatorioFerias(){
 // ===== RELATÓRIO: PERÍODOS DE FÉRIAS EM ABERTO =====
 function alternarTipoRelFerias(){
   var t=(document.getElementById('rel-fer-tipo')||{value:'programadas'}).value;
-  document.getElementById('rel-fer-abertos-filtros').style.display=t==='abertos'?'':'none';
-  document.getElementById('rel-fer-prog-filtros').style.display=t==='abertos'?'none':'';
-  if(t==='abertos'){
+  var ehPer=(t==='abertos'||t==='semgozo');
+  document.getElementById('rel-fer-abertos-filtros').style.display=ehPer?'':'none';
+  document.getElementById('rel-fer-prog-filtros').style.display=ehPer?'none':'';
+  if(ehPer){
     var sel=document.getElementById('rel-fer-depto');var cur=sel.value;
     var deptos=[...new Set(funcionarios.filter(function(f){return f.ativo!==false;}).map(function(f){return f.depto;}).filter(Boolean))].sort();
     sel.innerHTML='<option value="">Todos os setores</option>'+deptos.map(function(d){return '<option value="'+d+'"'+(d===cur?' selected':'')+'>'+d+'</option>';}).join('');
   }
 }
+function _tipoRelFerias(){return (document.getElementById('rel-fer-tipo')||{value:'programadas'}).value;}
 function relFeriasExcel(){
-  if((document.getElementById('rel-fer-tipo')||{}).value==='abertos')gerarRelPeriodosAbertosExcel();else gerarRelatorioFeriasExcel();
+  var t=_tipoRelFerias();
+  if(t==='abertos'||t==='semgozo')gerarRelPeriodosAbertosExcel();else gerarRelatorioFeriasExcel();
 }
 function relFeriasPDF(){
-  if((document.getElementById('rel-fer-tipo')||{}).value==='abertos')gerarRelPeriodosAbertosPDF();else gerarRelatorioFeriasPDF();
+  var t=_tipoRelFerias();
+  if(t==='abertos'||t==='semgozo')gerarRelPeriodosAbertosPDF();else gerarRelatorioFeriasPDF();
 }
 function getDadosPeriodosAbertos(){
   var dep=(document.getElementById('rel-fer-depto')||{value:''}).value;
@@ -6711,7 +6814,13 @@ function getDadosPeriodosAbertos(){
   funcionarios.filter(function(f){return f.ativo!==false&&(!dep||f.depto===dep);}).forEach(function(f){
     getFuncPeriodos(f).forEach(function(p){
       var saldo=getSaldoPeriodo(p);
-      if(saldo<=0)return;
+      if(_tipoRelFerias()==='semgozo'){
+        // Só períodos aquisitivos já encerrados e sem nenhum dia de gozo lançado
+        var fimP=_dataLocal(p.fim);
+        if(!fimP||fimP>=hoje)return;
+        var gozado=(p.gozos||[]).reduce(function(a,g){return a+(g.diasGozo||0);},0);
+        if(gozado>0||(p.gozos||[]).length)return;
+      } else if(saldo<=0)return;
       var direito=p.saldoInicial||30;
       var vn=_dataLocal(p.vencimento);
       var dv=vn?Math.round((vn-hoje)/864e5):null;
@@ -6733,23 +6842,25 @@ function _txtDiasVenc(d){return d===null?'—':d<0?'Vencido há '+(-d)+' dia(s)'
 function gerarRelPeriodosAbertosExcel(){
   if(typeof XLSX==='undefined'){toast('Aguarde o sistema carregar.',false);return;}
   var dados=getDadosPeriodosAbertos();
-  if(!dados.length){toast('Nenhum período em aberto para o filtro selecionado.',false);return;}
+  if(!dados.length){toast(_tipoRelFerias()==='semgozo'?'✅ Nenhum período encerrado sem gozo para o filtro selecionado.':'Nenhum período em aberto para o filtro selecionado.',_tipoRelFerias()==='semgozo');return;}
   var rows=[['Colaborador','Cargo','Setor','Período aquisitivo — início','Período aquisitivo — fim','Dias de direito','Dias gozados','Saldo (dias)','Vencimento','Dias para vencer','Situação']];
   dados.forEach(function(l){rows.push([l.nome,l.cargo,l.setor,fmtData(l.inicio),fmtData(l.fim),l.direito,l.gozados,l.saldo,fmtData(l.vencimento),l.dias===null?'':l.dias,l.situacao]);});
   rows.push([]);
-  rows.push(['Total de períodos em aberto',dados.length,'','','','','','Saldo total (dias)',dados.reduce(function(a,l){return a+l.saldo;},0)]);
+  rows.push([_tipoRelFerias()==='semgozo'?'Total de períodos sem gozo':'Total de períodos em aberto',dados.length,'','','','','','Saldo total (dias)',dados.reduce(function(a,l){return a+l.saldo;},0)]);
   rows.push(['Gerado em',new Date().toLocaleDateString('pt-BR')]);
   var ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:32},{wch:24},{wch:16},{wch:14},{wch:14},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12},{wch:22}];
-  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Períodos em aberto');
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,_tipoRelFerias()==='semgozo'?'Sem gozo':'Períodos em aberto');
   var dep=(document.getElementById('rel-fer-depto')||{value:''}).value;
-  XLSX.writeFile(wb,'Ferias_Periodos_em_Aberto'+(dep?'_'+dep.replace(/\s+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  var nomeArq=(_tipoRelFerias()==='semgozo'?'Ferias_Periodos_Sem_Gozo':'Ferias_Periodos_em_Aberto')+(dep?'_'+dep.replace(/\s+/g,'_'):'')+'_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  var bin=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  baixarArquivo(new Blob([bin],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),nomeArq);
   fecharModalRelatorioFerias();
-  toast('✅ Relatório exportado — '+dados.length+' período(s) em aberto');
+  toast('✅ Relatório exportado — '+dados.length+' período(s)'+(_tipoRelFerias()==='semgozo'?' sem gozo':' em aberto'));
 }
 function gerarRelPeriodosAbertosPDF(){
   var dados=getDadosPeriodosAbertos();
-  if(!dados.length){toast('Nenhum período em aberto para o filtro selecionado.',false);return;}
+  if(!dados.length){toast(_tipoRelFerias()==='semgozo'?'✅ Nenhum período encerrado sem gozo para o filtro selecionado.':'Nenhum período em aberto para o filtro selecionado.',_tipoRelFerias()==='semgozo');return;}
   var dep=(document.getElementById('rel-fer-depto')||{value:''}).value;
   var cores={'Vencido':'#dc2626','Vence em até 30 dias':'#ea580c','Vence em até 60 dias':'#ca8a04','No prazo':'#16a34a','Sem vencimento':'#888'};
   var esc=function(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;');};
@@ -6761,9 +6872,9 @@ function gerarRelPeriodosAbertosPDF(){
   }).join('');
   var cont={};dados.forEach(function(l){cont[l.situacao]=(cont[l.situacao]||0)+1;});
   var resumo=Object.keys(cores).filter(function(k){return cont[k];}).map(function(k){return '<span style="color:'+cores[k]+';font-weight:700;">'+k+': '+cont[k]+'</span>';}).join(' &nbsp;·&nbsp; ');
-  var titulo='Férias — Períodos em Aberto'+(dep?' — '+esc(dep):'');
+  var titulo=(_tipoRelFerias()==='semgozo'?'Férias — Períodos Encerrados Sem Nenhum Gozo':'Férias — Períodos em Aberto')+(dep?' — '+esc(dep):'');
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}h2{color:#11205b;font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{background:#11205b;color:#fff;padding:6px 8px;text-align:left;font-size:10px;}td{padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;}tr:nth-child(even){background:#f8f9ff;}@media print{button{display:none;}}</style></head><body>';
-  html+='<h2>'+titulo+'</h2><div style="color:#666;font-size:10px;">Gerado em '+new Date().toLocaleDateString('pt-BR')+' — '+dados.length+' período(s) em aberto — saldo total: '+dados.reduce(function(a,l){return a+l.saldo;},0)+' dia(s)</div>';
+  html+='<h2>'+titulo+'</h2><div style="color:#666;font-size:10px;">Gerado em '+new Date().toLocaleDateString('pt-BR')+' — '+dados.length+' período(s)'+(_tipoRelFerias()==='semgozo'?' sem gozo lançado':' em aberto')+' — saldo total: '+dados.reduce(function(a,l){return a+l.saldo;},0)+' dia(s)</div>';
   html+='<div style="margin-top:6px;font-size:11px;">'+resumo+'</div>';
   html+='<table><thead><tr><th>Colaborador</th><th>Cargo</th><th>Setor</th><th>Período aquisitivo</th><th>Direito</th><th>Gozados</th><th>Saldo</th><th>Vencimento</th><th>Prazo</th><th>Situação</th></tr></thead><tbody>'+linhas+'</tbody></table>';
   html+='<br><button onclick="window.print()" style="background:#11205b;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button></body></html>';
@@ -6834,12 +6945,7 @@ function gerarRelatorioFeriasExcel(){
   }).join('\n');
   var BOM = '\uFEFF';
   var blob = new Blob([BOM+csvContent],{type:'text/csv;charset=utf-8;'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'Ferias_Programadas'+(mes?'_M'+mes:'')+(ano?'_'+ano:'')+'.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  baixarArquivo(blob,'Ferias_Programadas'+(mes?'_M'+mes:'')+(ano?'_'+ano:'')+'.csv');
   fecharModalRelatorioFerias();
   toast('✅ Excel exportado!');
 }
