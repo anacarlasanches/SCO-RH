@@ -807,7 +807,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
 <!-- RELATÓRIOS RH -->
 <div id="page-rh" class="page">
   <div class="page-title">Relatórios de RH</div>
-  <div class="page-sub">Indicadores de admissões, demissões e turnover</div>
+  <div class="page-sub">Indicadores de admissões, demissões e turnover — considera apenas CLT e PJ</div>
 
   <div class="filter-bar">
     <select id="rh-mes" onchange="renderRH()">
@@ -3286,9 +3286,14 @@ function renderRH(){
   if(!mesEl||!anoEl) return;
   const mes=mesEl.value;
   const ano=parseInt(anoEl.value);
+  // Indicadores desta aba consideram apenas CLT e PJ (sem autônomos/freelancers)
+  const _funcsRH=funcionarios.filter(function(f){
+    var t=String(f.tipo||'CLT').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    return t==='CLT'||t==='PJ';
+  });
 
   // Filtrar admissões no período
-  const admissoes=funcionarios.filter(function(f){
+  const admissoes=_funcsRH.filter(function(f){
     if(!f.admissao) return false;
     const parts=f.admissao.split('-');
     const fAno=parseInt(parts[0]), fMes=parseInt(parts[1]);
@@ -3296,7 +3301,7 @@ function renderRH(){
   });
 
   // Filtrar demissões no período
-  const demissoes=funcionarios.filter(function(f){
+  const demissoes=_funcsRH.filter(function(f){
     if(!f.demissao||!f.demissao.data) return false;
     const parts=f.demissao.data.split('-');
     const fAno=parseInt(parts[0]), fMes=parseInt(parts[1]);
@@ -3304,8 +3309,8 @@ function renderRH(){
   });
 
   // Headcount ativo no período
-  const totalAtivos=funcionarios.filter(function(f){return f.ativo!==false;}).length;
-  const totalInativos=funcionarios.filter(function(f){return f.ativo===false;}).length;
+  const totalAtivos=_funcsRH.filter(function(f){return f.ativo!==false;}).length;
+  const totalInativos=_funcsRH.filter(function(f){return f.ativo===false;}).length;
 
   // Custos de demissão
   const custoRescisao=demissoes.reduce(function(a,f){return a+(f.demissao.valor||0);},0);
@@ -4138,6 +4143,10 @@ function _periodoDesde(inicio,fid){
   var ini=_isoLocal(inicio);
   return {id:'p_auto_'+fid+'_'+ini,inicio:ini,fim:_isoLocal(fim),vencimento:_isoLocal(venc),saldoInicial:30,gozos:[],auto:true};
 }
+function _entraNasFerias(f){
+  var t=String((f&&f.tipo)||'CLT').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return !(t==='PJ'||t.indexOf('AUTONOMO')===0||t.indexOf('FREELA')===0);
+}
 function _ehCLTAtivo(f){return f&&f.ativo!==false&&(f.tipo||'CLT').toUpperCase()==='CLT';}
 // Abre o 1º período de um CLT recém-cadastrado
 function abrirPrimeiroPeriodo(f){
@@ -4255,7 +4264,7 @@ function renderFeriasCtrl(){
   var el=document.getElementById('ferias-ctrl-lista');
   if(!el)return;
 
-  var list=funcionarios.filter(function(f){return f.ativo!==false;});
+  var list=funcionarios.filter(function(f){return f.ativo!==false&&_entraNasFerias(f);});
   if(busca)list=list.filter(function(f){return f.nome.toLowerCase().includes(busca);});
   // Filtro por mês de gozo programado (data futura lançada)
   if(mesProg){
@@ -6226,7 +6235,7 @@ function abrirModalProgramarFerias(){
   var sel=document.getElementById('pfr-func');
   if(sel&&sel.options.length<=1){
     sel.innerHTML='<option value="">Selecione...</option>';
-    funcionarios.filter(function(f){return f.ativo!==false&&f.tipo!=='PJ'&&f.tipo!=='Autônomo';})
+    funcionarios.filter(function(f){return f.ativo!==false&&_entraNasFerias(f);})
       .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');})
       .forEach(function(f){sel.innerHTML+='<option value="'+f.id+'">'+f.nome+'</option>';});
   }
@@ -6339,7 +6348,7 @@ function abrirModalNovoPeriodo(){
   var sel=document.getElementById('np-func');
   if(sel&&sel.options.length<=1){
     sel.innerHTML='<option value="">Selecione...</option>';
-    funcionarios.filter(function(f){return f.ativo!==false;})
+    funcionarios.filter(function(f){return f.ativo!==false&&_entraNasFerias(f);})
       .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');})
       .forEach(function(f){sel.innerHTML+='<option value="'+f.id+'">'+f.nome+'</option>';});
   }
@@ -6793,7 +6802,7 @@ function alternarTipoRelFerias(){
   document.getElementById('rel-fer-prog-filtros').style.display=ehPer?'none':'';
   if(ehPer){
     var sel=document.getElementById('rel-fer-depto');var cur=sel.value;
-    var deptos=[...new Set(funcionarios.filter(function(f){return f.ativo!==false;}).map(function(f){return f.depto;}).filter(Boolean))].sort();
+    var deptos=[...new Set(funcionarios.filter(function(f){return f.ativo!==false&&_entraNasFerias(f);}).map(function(f){return f.depto;}).filter(Boolean))].sort();
     sel.innerHTML='<option value="">Todos os setores</option>'+deptos.map(function(d){return '<option value="'+d+'"'+(d===cur?' selected':'')+'>'+d+'</option>';}).join('');
   }
 }
@@ -6811,7 +6820,7 @@ function getDadosPeriodosAbertos(){
   var sit=(document.getElementById('rel-fer-situacao')||{value:''}).value;
   var h=new Date();var hoje=new Date(h.getFullYear(),h.getMonth(),h.getDate());
   var linhas=[];
-  funcionarios.filter(function(f){return f.ativo!==false&&(!dep||f.depto===dep);}).forEach(function(f){
+  funcionarios.filter(function(f){return f.ativo!==false&&_entraNasFerias(f)&&(!dep||f.depto===dep);}).forEach(function(f){
     getFuncPeriodos(f).forEach(function(p){
       var saldo=getSaldoPeriodo(p);
       if(_tipoRelFerias()==='semgozo'){
@@ -6887,7 +6896,7 @@ function getDadosRelatorioFerias(){
   var mes = parseInt(document.getElementById('rel-fer-mes').value)||0;
   var ano = parseInt(document.getElementById('rel-fer-ano').value)||0;
   var linhas = [];
-  funcionarios.filter(function(f){return f.ativo!==false;})
+  funcionarios.filter(function(f){return f.ativo!==false&&_entraNasFerias(f);})
     .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');})
     .forEach(function(f){
       var periodos = f.periodos||[];
