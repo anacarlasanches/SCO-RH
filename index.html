@@ -257,6 +257,8 @@ body.perfil-assistente #page-rh tr.rh-total{display:none!important;}
 body.perfil-assistente #page-ferias-ctrl .fer-np-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-gozo-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-gozo-per-btn,
+body.perfil-assistente #page-ferias-ctrl .fer-edit-periodo-btn,
+body.perfil-assistente #page-ferias-ctrl .fer-rm-periodo-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-pagar-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-edit-gozo-btn,
 body.perfil-assistente #page-ferias-ctrl .rm-gozo-btn{display:none!important;}
@@ -1219,7 +1221,6 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       <option value="2027">2027</option>
     </select>
     <button class="btn btn-orange so-admin" onclick="abrirModalProgramarFerias()">🏖️ Programar Férias</button>
-    <button class="btn btn-primary so-admin" onclick="abrirModalNovoPeriodo()" style="background:#3b82f6;">📅 Novo Período</button>
     <button class="btn btn-sm" onclick="abrirModalRelatorioFerias()" style="background:#16a34a;color:#fff;">📊 Relatório Excel/PDF</button>
   </div>
   <div id="fer-aviso-sem-periodo"></div>
@@ -1631,20 +1632,35 @@ function verFuncionario(id){
       +'<div style="font-size:13px;font-weight:600;color:var(--sco-azul);word-break:break-word;">'+val+'</div></div>';
   });
   html += '</div>';
-  // Férias
-  if(f.ferias && f.ferias.diasSaldo > 0){
+  // Férias — calculado a partir dos períodos aquisitivos da aba Férias (só exibição)
+  var _psF=(f.periodos||[]).filter(function(p){return getSaldoPeriodo(p)>0;})
+    .sort(function(a,b){return (a.inicio||'').localeCompare(b.inicio||'');});
+  if((f.periodos||[]).length){
+    var _tot=_psF.reduce(function(a,p){return a+getSaldoPeriodo(p);},0);
+    var _h=new Date();var _hoje=new Date(_h.getFullYear(),_h.getMonth(),_h.getDate());
     html += '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px;margin-top:12px;">'
-      +'<div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:8px;">🏖️ Saldo de Férias</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
-      +'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Dias disponíveis</div>'
-      +'<div style="font-size:18px;font-weight:700;color:#1d4ed8;">'+f.ferias.diasSaldo+' dias</div></div>'
-      +(f.ferias.periodoInicio&&f.ferias.periodoFim
-        ?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Período aquisitivo</div>'
-        +'<div style="font-size:13px;font-weight:600;color:#1d4ed8;">'+fmtData(f.ferias.periodoInicio)+' a '+fmtData(f.ferias.periodoFim)+'</div></div>':'')
-      +(f.ferias.vencimento
-        ?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Vencimento</div>'
-        +'<div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmtData(f.ferias.vencimento)+'</div></div>':'')
-      +'</div></div>';
+      +'<div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:8px;">🏖️ Saldo de Férias</div>';
+    if(!_psF.length){
+      html += '<div style="background:#fff;border-radius:6px;padding:8px 10px;font-size:13px;font-weight:600;color:#16a34a;">✓ Nenhum período em aberto — todos os períodos já foram gozados</div>';
+    } else {
+      html += '<div style="background:#fff;border-radius:6px;padding:8px 10px;margin-bottom:6px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Dias disponíveis (total)</div>'
+        +'<div style="font-size:18px;font-weight:700;color:#1d4ed8;">'+_tot+' dias</div></div>'
+        +'<table style="width:100%;font-size:12px;background:#fff;border-radius:6px;border-collapse:collapse;"><thead><tr style="color:#888;font-size:10px;text-transform:uppercase;"><th style="text-align:left;padding:6px 8px;">Período aquisitivo</th><th style="text-align:left;padding:6px 8px;">Saldo</th><th style="text-align:left;padding:6px 8px;">Vencimento</th></tr></thead><tbody>'
+        +_psF.map(function(p){
+          var vn=_dataLocal(p.vencimento);var venc=vn&&vn<_hoje;
+          return '<tr style="border-top:1px solid #eef2fb;"><td style="padding:6px 8px;color:#1d4ed8;font-weight:600;">'+fmtData(p.inicio)+' a '+fmtData(p.fim)+'</td>'
+            +'<td style="padding:6px 8px;font-weight:700;">'+getSaldoPeriodo(p)+' dias</td>'
+            +'<td style="padding:6px 8px;font-weight:600;color:'+(venc?'#dc2626':'#555')+';">'+(p.vencimento?fmtData(p.vencimento):'—')+(venc?' (vencido)':'')+'</td></tr>';
+        }).join('')
+        +'</tbody></table>';
+    }
+    html += '</div>';
+    } else if(f.ferias && f.ferias.diasSaldo > 0){
+    // Sem períodos cadastrados: mostra o saldo importado por planilha (como antes)
+    html += '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px;margin-top:12px;font-size:13px;color:#1d4ed8;">'
+      +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">🏖️ Saldo de Férias (importado)</div>'
+      +'<strong>'+f.ferias.diasSaldo+' dias</strong>'+(f.ferias.periodoInicio?' — período '+fmtData(f.ferias.periodoInicio)+' a '+fmtData(f.ferias.periodoFim):'')
+      +(f.ferias.vencimento?' — vence '+fmtData(f.ferias.vencimento):'')+'</div>';
   }
 
   // Histórico salarial do funcionário
@@ -4095,6 +4111,7 @@ let npFuncId=null;
 function abrirNovoPeriodo(funcId){
   const f=funcionarios.find(function(f){return f.id===funcId;});
   if(!f) return;
+  _npfEditPid=null;
   npFuncId=funcId;
   document.getElementById('novo-periodo-func-nome').textContent=f.nome+' — '+f.cargo;
   const periodos=getFuncPeriodos(f);
@@ -4121,6 +4138,31 @@ function abrirNovoPeriodo(funcId){
   var _m=document.getElementById('modal-periodo-func');_m.classList.add('open');_m.style.display='flex';
 }
 
+var _npfEditPid=null;
+function editarPeriodo(funcId,periodoId){
+  var f=funcionarios.find(function(x){return x.id===funcId;});if(!f)return;
+  var p=getFuncPeriodos(f).find(function(x){return x.id===periodoId;});if(!p)return;
+  abrirNovoPeriodo(funcId);
+  _npfEditPid=periodoId;
+  document.getElementById('novo-periodo-func-nome').textContent='✏️ Editar período — '+f.nome;
+  document.getElementById('npf-inicio').value=p.inicio||'';
+  document.getElementById('npf-fim').value=p.fim||'';
+  document.getElementById('npf-vencimento').value=p.vencimento||'';
+  document.getElementById('npf-saldo').value=p.saldoInicial||30;
+}
+function excluirPeriodo(funcId,periodoId){
+  var f=funcionarios.find(function(x){return x.id===funcId;});if(!f)return;
+  var ps=getFuncPeriodos(f);
+  var p=ps.find(function(x){return x.id===periodoId;});if(!p)return;
+  var nG=(p.gozos||[]).length;
+  var msg='Excluir o período '+fmtData(p.inicio)+' → '+fmtData(p.fim)+' de '+f.nome+'?'
+    +(nG?'\n\n⚠️ ATENÇÃO: este período tem '+nG+' gozo(s) lançado(s), que também serão apagados.':'\n\nEle não tem nenhum gozo lançado.')
+    +'\n\nEssa ação não pode ser desfeita.';
+  if(!confirm(msg))return;
+  f.periodos=ps.filter(function(x){return x.id!==periodoId;});
+  save();renderFeriasCtrl();
+  toast('🗑️ Período excluído.');
+}
 function confirmarNovoPeriodo(){
   const f=funcionarios.find(function(f){return f.id===npFuncId;});
   if(!f) return;
@@ -4129,12 +4171,20 @@ function confirmarNovoPeriodo(){
   const fim=document.getElementById('npf-fim').value;
   const saldo=parseInt(document.getElementById('npf-saldo').value)||30;
   if(!inicio||!vencimento){toast('Preencha início e vencimento.',false);return;}
+  if(_npfEditPid){
+    var pe=getFuncPeriodos(f).find(function(x){return x.id===_npfEditPid;});
+    if(pe){pe.inicio=inicio;pe.fim=fim;pe.vencimento=vencimento;pe.saldoInicial=saldo;}
+    _npfEditPid=null;
+    save();fecharNovoPeriodo();renderFeriasCtrl();
+    toast('✅ Período atualizado!');return;
+  }
   getFuncPeriodos(f).push({id:'p_'+Date.now(),inicio,fim,vencimento,saldoInicial:saldo,gozos:[]});
   save();fecharNovoPeriodo();renderFeriasCtrl();
   toast('✅ Período aquisitivo criado!');
 }
 
 function fecharNovoPeriodo(){
+  _npfEditPid=null;
   var _m=document.getElementById('modal-periodo-func');_m.classList.remove('open');_m.style.display='none';
   npFuncId=null;
 }
@@ -4351,7 +4401,7 @@ function renderFeriasCtrl(){
       // Cores
       var cSaldo=sl<=0?'#aaa':sl<=10?'#f59e0b':'#16a34a';
       var cVenc=sl<=0?'#ccc':dv===null?'#888':dv<0?'#dc2626':dv<=60?'#f59e0b':'#16a34a';
-      var status=sl<=0?'<span style="color:#aaa;font-size:11px;">✓ Gozado</span>'
+      var status=sl<=0?'<span title="Período 100% gozado" style="color:#16a34a;font-size:11px;font-weight:700;">✓ OK</span>'
         :dv===null?'<span style="color:#888;font-size:11px;">OK</span>'
         :dv<0?'<span style="color:#dc2626;font-size:11px;font-weight:700;">Vencido!</span>'
         :dv<=60?'<span style="color:#f59e0b;font-size:11px;font-weight:700;">⚠️ '+dv+'d</span>'
@@ -4388,6 +4438,8 @@ function renderFeriasCtrl(){
         +'<td style="font-size:12px;color:#555;white-space:nowrap;">'
           +(p.inicio?fmtData(p.inicio):'--')+' → '+(p.fim?fmtData(p.fim):'--')
           +(isAtivo?'<span style="background:#eff6ff;color:#3b82f6;font-size:9px;padding:1px 5px;border-radius:6px;margin-left:4px;font-weight:700;">ATIVO</span>':'')
+          +'<button class="fer-edit-periodo-btn" data-fid="'+f.id+'" data-pid="'+p.id+'" title="Editar datas do período" style="background:none;border:none;cursor:pointer;padding:0 0 0 6px;font-size:11px;">✏️</button>'
+          +'<button class="fer-rm-periodo-btn" data-fid="'+f.id+'" data-pid="'+p.id+'" title="Excluir período" style="background:none;border:none;cursor:pointer;padding:0 0 0 4px;font-size:11px;">🗑️</button>'
           +'</td>'
         // Vencimento
         +'<td style="font-size:12px;color:'+cVenc+';font-weight:600;white-space:nowrap;">'+(p.vencimento?fmtData(p.vencimento):'—')+'</td>'
@@ -4824,6 +4876,8 @@ document.addEventListener('click',function(e){
   if(frg){removerGozo(frg.dataset.fid,frg.dataset.pid,frg.dataset.gid);return;}
   var fpb=e.target.closest&&e.target.closest('.fer-pagar-btn');
   if(fpb){abrirModalPagarFerias(fpb.dataset.fid,fpb.dataset.pid,fpb.dataset.gid);return;}
+  var frp=e.target.closest&&e.target.closest('.fer-rm-periodo-btn');
+  if(frp){excluirPeriodo(frp.dataset.fid,frp.dataset.pid);return;}
   var fep=e.target.closest&&e.target.closest('.fer-edit-periodo-btn');
   if(fep){editarPeriodo(fep.dataset.fid,fep.dataset.pid);return;}
   var fxp=e.target.closest&&e.target.closest('.fer-del-periodo-btn');
@@ -6688,7 +6742,7 @@ var ACOES_BLOQUEADAS_ASSISTENTE=[
   'editarFuncionario','salvarEditFunc','desativarFuncionario','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
   'abrirModalProgramarFerias','salvarProgramacaoFerias','abrirModalNovoPeriodo','salvarNovoPeriodo','abrirModalPagarFerias','salvarPagamentoFerias',
   'abrirLancarFeriasPeriodo','abrirLancarFerias','confirmarLancarFerias','editarGozo','salvarEditGozo','removerGozo','abrirNovoPeriodo','confirmarNovoPeriodo',
-  'confirmarFerias','cancelarFerias','abrirPeriodosSelecionados','marcarGozoHistorico','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
+  'confirmarFerias','cancelarFerias','abrirPeriodosSelecionados','marcarGozoHistorico','editarPeriodo','excluirPeriodo','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
   'salvarMeta','removerMeta','importarMetasPlanilha',
   'abrirModalAvaliacao','editarAvaliacao','salvarAvaliacao','excluirAvaliacao','importarAvaliacoesXLSX','importarAvaliacaoXLSX','verDetalhesAvaliacao',
   'exportarDados','exportarDadosComLog','importarDados','abrirModalLancamento','salvarLancamento','editarLancamento','openModal'
