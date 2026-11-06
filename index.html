@@ -933,34 +933,34 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
 </div>
 
 <!-- MODAL NOVO PERÍODO -->
-<div class="detail-overlay" id="modal-novo-periodo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharModalNovoPeriodo()">
+<div class="detail-overlay" id="modal-periodo-func" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharNovoPeriodo()">
   <div class="detail-modal" style="width:500px;max-width:95vw;">
     <div class="modal-header">
       <h2>➕ Novo período aquisitivo</h2>
-      <button class="btn btn-sm" onclick="fecharModalNovoPeriodo()" style="color:#888;">✕</button>
+      <button class="btn btn-sm" onclick="fecharNovoPeriodo()" style="color:#888;">✕</button>
     </div>
     <div id="novo-periodo-func-nome" style="font-size:15px;font-weight:700;color:var(--sco-azul);margin-bottom:14px;"></div>
     <div class="form-grid">
       <div class="form-group">
         <label>Início do período *</label>
-        <input type="date" id="np-inicio"/>
+        <input type="date" id="npf-inicio"/>
       </div>
       <div class="form-group">
         <label>Fim do período *</label>
-        <input type="date" id="np-fim"/>
+        <input type="date" id="npf-fim"/>
       </div>
       <div class="form-group">
         <label>Data de vencimento *</label>
-        <input type="date" id="np-vencimento"/>
+        <input type="date" id="npf-vencimento"/>
       </div>
       <div class="form-group">
         <label>Saldo inicial (dias)</label>
-        <input type="number" id="np-saldo" value="30" min="1"/>
+        <input type="number" id="npf-saldo" value="30" min="1"/>
       </div>
     </div>
     <div class="btn-actions">
-      <button class="btn btn-orange" onclick="salvarNovoPeriodo()">✅ Criar período</button>
-      <button class="btn btn-outline" onclick="fecharModalNovoPeriodo()">✕ Cancelar</button>
+      <button class="btn btn-orange" onclick="confirmarNovoPeriodo()">✅ Criar período</button>
+      <button class="btn btn-outline" onclick="fecharNovoPeriodo()">✕ Cancelar</button>
     </div>
   </div>
 </div>
@@ -4104,20 +4104,20 @@ function abrirNovoPeriodo(funcId){
     const admL=_dataLocal(f.admissao);
     if(admL){const pp=_periodoDesde(admL,f.id);inicioSug=pp.inicio;fimSug=pp.fim;vencSug=pp.vencimento;}
   }
-  document.getElementById('np-inicio').value=inicioSug;
-  document.getElementById('np-fim').value=fimSug;
-  document.getElementById('np-vencimento').value=vencSug;
-  document.getElementById('np-saldo').value='30';
-  document.getElementById('modal-novo-periodo').classList.add('open');
+  document.getElementById('npf-inicio').value=inicioSug;
+  document.getElementById('npf-fim').value=fimSug;
+  document.getElementById('npf-vencimento').value=vencSug;
+  document.getElementById('npf-saldo').value='30';
+  var _m=document.getElementById('modal-periodo-func');_m.classList.add('open');_m.style.display='flex';
 }
 
 function confirmarNovoPeriodo(){
   const f=funcionarios.find(function(f){return f.id===npFuncId;});
   if(!f) return;
-  const inicio=document.getElementById('np-inicio').value;
-  const vencimento=document.getElementById('np-vencimento').value;
-  const fim=document.getElementById('np-fim').value;
-  const saldo=parseInt(document.getElementById('np-saldo').value)||30;
+  const inicio=document.getElementById('npf-inicio').value;
+  const vencimento=document.getElementById('npf-vencimento').value;
+  const fim=document.getElementById('npf-fim').value;
+  const saldo=parseInt(document.getElementById('npf-saldo').value)||30;
   if(!inicio||!vencimento){toast('Preencha início e vencimento.',false);return;}
   getFuncPeriodos(f).push({id:'p_'+Date.now(),inicio,fim,vencimento,saldoInicial:saldo,gozos:[]});
   save();fecharNovoPeriodo();renderFeriasCtrl();
@@ -4125,7 +4125,7 @@ function confirmarNovoPeriodo(){
 }
 
 function fecharNovoPeriodo(){
-  document.getElementById('modal-novo-periodo').classList.remove('open');
+  var _m=document.getElementById('modal-periodo-func');_m.classList.remove('open');_m.style.display='none';
   npFuncId=null;
 }
 
@@ -4389,8 +4389,11 @@ function renderFeriasCtrl(){
                 // Ações
         +(pi===0
           ?'<td rowspan="'+psFilt.length+'" style="vertical-align:top;padding-top:8px;">'
-            +'</td>'
-          :'<td></td>')
+            +'<div style="display:flex;flex-direction:column;gap:5px;">'
+            +'<button class="btn btn-primary btn-sm fer-gozo-btn" style="font-size:11px;white-space:nowrap;" data-fid="'+f.id+'">🏖️ Gozo</button>'
+            +'<button class="btn btn-outline btn-sm fer-np-btn" style="font-size:11px;white-space:nowrap;" data-fid="'+f.id+'">+ Período</button>'
+            +'</div></td>'
+          :'')
         +'</tr>';
     }).join('');
   }).join('');
