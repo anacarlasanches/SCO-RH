@@ -256,6 +256,7 @@ body.perfil-assistente #page-rh table td:nth-child(n+5),
 body.perfil-assistente #page-rh tr.rh-total{display:none!important;}
 body.perfil-assistente #page-ferias-ctrl .fer-np-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-gozo-btn,
+body.perfil-assistente #page-ferias-ctrl .fer-gozo-per-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-pagar-btn,
 body.perfil-assistente #page-ferias-ctrl .fer-edit-gozo-btn,
 body.perfil-assistente #page-ferias-ctrl .rm-gozo-btn{display:none!important;}
@@ -406,6 +407,10 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn btn-orange" onclick="salvarPagamentoFerias()">💰 Confirmar Pagamento</button>
         <button class="btn btn-outline" onclick="fecharModalPagarFerias()">✕ Cancelar</button>
+      </div>
+      <div style="border-top:1px solid #eef0f6;margin-top:14px;padding-top:12px;font-size:12px;color:#666;">
+        Férias antigas, sem valor para informar?
+        <button class="btn btn-sm" onclick="marcarGozoHistorico()" style="margin-left:6px;background:#f1f3f9;color:#11205b;border:1px solid #d5daea;">🗂️ Registrar como lançamento antigo</button>
       </div>
     </div>
   </div>
@@ -923,6 +928,9 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       <div class="form-group" style="grid-column:1/-1">
         <label>Observação</label>
         <input id="fer-obs" placeholder="Ex: 10 dias + 5 abono pecuniário..."/>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:600;cursor:pointer;"><input type="checkbox" id="fer-historico" style="width:auto;"/> 🗂️ Lançamento antigo, sem valor (não fica pendente de pagamento)</label>
       </div>
     </div>
     <div class="btn-actions">
@@ -3981,6 +3989,7 @@ function abrirLancarFerias(funcId){
     sel.innerHTML+='<option value="'+p.id+'">'+(saldo<=0?'✓ Gozado — ':'')+(p.inicio?fmtData(p.inicio)+' → ':'')+( p.fim?fmtData(p.fim):p.id)+' (saldo: '+saldo+' dias disponíveis</option>';
   });
   ['fer-dias-gozo','fer-gozo-inicio','fer-gozo-fim','fer-valor','fer-data-pgto','fer-obs'].forEach(function(id){document.getElementById(id).value='';});
+  var _fh=document.getElementById('fer-historico');if(_fh)_fh.checked=false;
   document.getElementById('fer-saldo-disp').textContent='— dias';
   document.getElementById('modal-lancar-ferias').classList.add('open');
 }
@@ -4017,6 +4026,7 @@ function confirmarLancarFerias(){
     valor:parseFloat(document.getElementById('fer-valor').value)||0,
     dataPgto:document.getElementById('fer-data-pgto').value,
     obs:document.getElementById('fer-obs').value};
+  if((document.getElementById('fer-historico')||{}).checked && !(gozo.valor>0)) gozo.historico=true;
   periodos[pIdx].gozos=periodos[pIdx].gozos||[];
   periodos[pIdx].gozos.push(gozo);
   const novoSaldo=saldo-diasGozo;
@@ -4310,6 +4320,8 @@ function renderFeriasCtrl(){
     var abertos=ps.filter(function(p){return getSaldoPeriodo(p)>0;});
     var fechados=ps.filter(function(p){return getSaldoPeriodo(p)<=0;});
     var psFilt=(filtroPer==='zerados')?fechados:(filtroPer==='todos')?ps:abertos;
+    // Mostrar em ordem cronológica (só a exibição; os dados não mudam)
+    psFilt=psFilt.slice().sort(function(a,b){return (a.inicio||'').localeCompare(b.inicio||'')||(a.fim||'').localeCompare(b.fim||'');});
 
     if(!ps.length){
       return '<tr>'
@@ -4350,16 +4362,19 @@ function renderFeriasCtrl(){
       // Gozos
       var gozosTxt=(p.gozos&&p.gozos.length)
         ?p.gozos.map(function(g){
-          var isProg=!g.valor||g.valor===0;
-          var corSpan=isProg?'background:#fff7ed;border:1px solid #f59e0b;':'background:#f0f4ff;border:1px solid #d5daea;';
+          var isHist=!!g.historico&&!(g.valor>0);
+          var isProg=!isHist&&(!g.valor||g.valor===0);
+          var corSpan=isProg?'background:#fff7ed;border:1px solid #f59e0b;':isHist?'background:#f6f7f9;border:1px solid #e2e5ec;color:#666;':'background:#f0f4ff;border:1px solid #d5daea;';
           return '<span style="'+corSpan+'border-radius:4px;padding:2px 6px;font-size:11px;display:inline-flex;align-items:center;gap:3px;">'
-            +(isProg?'📅 ':'✅ ')+g.diasGozo+'d'+(g.inicio?' ('+fmtData(g.inicio)+')':'')
+            +(isProg?'📅 ':isHist?'<span title="Lançamento antigo, sem valor">🗂️</span> ':'✅ ')+g.diasGozo+'d'+(g.inicio?' ('+fmtData(g.inicio)+')':'')
             +(isProg?'<button class="fer-pagar-btn" data-fid="'+f.id+'" data-pid="'+p.id+'" data-gid="'+g.id+'" style="background:#f59e0b;color:#fff;border:none;border-radius:3px;cursor:pointer;padding:1px 4px;font-size:10px;margin-left:2px;">💰 Pagar</button>':'')
             +'<button class="fer-edit-gozo-btn" data-fid="'+f.id+'" data-pid="'+p.id+'" data-gid="'+g.id+'" style="background:none;border:none;cursor:pointer;padding:0;font-size:11px;">✏️</button>'
             +'<button class="rm-gozo-btn" data-fid="'+f.id+'" data-pid="'+p.id+'" data-gid="'+g.id+'" style="background:none;border:none;cursor:pointer;padding:0;color:#f87171;font-size:11px;">✕</button>'
             +'</span>';
         }).join(' ')
         :'<span style="color:#ccc;font-size:11px;">—</span>';
+      // Lançar gozo direto neste período
+      if(sl>0) gozosTxt+=' <button class="fer-gozo-per-btn" data-fid="'+f.id+'" data-pid="'+p.id+'" title="Lançar gozo neste período" style="background:#eff6ff;color:#1d4ed8;border:1px dashed #93c5fd;border-radius:4px;cursor:pointer;padding:2px 7px;font-size:11px;">+ Gozo</button>';
 
       return '<tr style="'+(pi>0?'border-top:1px dashed #e8ecf5;':'')+'">'
         // Funcionário (só na primeira linha)
@@ -4797,6 +4812,8 @@ function confirmarImportFeriasCompleto(fMap,forcar){
 document.addEventListener('click',function(e){
   var rm=e.target.closest&&e.target.closest('.rm-meta-btn');
   if(rm){removerMeta(rm.dataset.fid,parseInt(rm.dataset.mes),parseInt(rm.dataset.ano));return;}
+  var fgp=e.target.closest&&e.target.closest('.fer-gozo-per-btn');
+  if(fgp){abrirLancarFeriasPeriodo(fgp.dataset.fid,fgp.dataset.pid);return;}
   var fnp=e.target.closest&&e.target.closest('.fer-np-btn');
   if(fnp){abrirNovoPeriodo(fnp.dataset.fid);return;}
   var fgb=e.target.closest&&e.target.closest('.fer-gozo-btn');
@@ -6396,6 +6413,14 @@ function abrirModalPagarFerias(funcId,periodoId,gozoId){
   document.getElementById('modal-pagar-ferias').style.display='flex';
 }
 
+function marcarGozoHistorico(){
+  var fi=funcionarios.findIndex(function(x){return x.id===_pagar_funcId;});if(fi<0)return;
+  var p=(funcionarios[fi].periodos||[]).find(function(x){return x.id===_pagar_periodoId;});if(!p)return;
+  var g=(p.gozos||[]).find(function(x){return x.id===_pagar_gozoId;});if(!g)return;
+  g.historico=true;
+  save();fecharModalPagarFerias();renderFeriasCtrl();
+  toast('🗂️ Gozo registrado como lançamento antigo (sem valor).');
+}
 function fecharModalPagarFerias(){
   document.getElementById('modal-pagar-ferias').style.display='none';
 }
@@ -6663,7 +6688,7 @@ var ACOES_BLOQUEADAS_ASSISTENTE=[
   'editarFuncionario','salvarEditFunc','desativarFuncionario','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
   'abrirModalProgramarFerias','salvarProgramacaoFerias','abrirModalNovoPeriodo','salvarNovoPeriodo','abrirModalPagarFerias','salvarPagamentoFerias',
   'abrirLancarFeriasPeriodo','abrirLancarFerias','confirmarLancarFerias','editarGozo','salvarEditGozo','removerGozo','abrirNovoPeriodo','confirmarNovoPeriodo',
-  'confirmarFerias','cancelarFerias','abrirPeriodosSelecionados','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
+  'confirmarFerias','cancelarFerias','abrirPeriodosSelecionados','marcarGozoHistorico','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
   'salvarMeta','removerMeta','importarMetasPlanilha',
   'abrirModalAvaliacao','editarAvaliacao','salvarAvaliacao','excluirAvaliacao','importarAvaliacoesXLSX','importarAvaliacaoXLSX','verDetalhesAvaliacao',
   'exportarDados','exportarDadosComLog','importarDados','abrirModalLancamento','salvarLancamento','editarLancamento','openModal'
@@ -6922,7 +6947,7 @@ function getDadosRelatorioFerias(){
             dataFim: g.fim||'',
             diasGozo: g.diasGozo||0,
             saldoRestante: saldo > 0 ? saldo : 0,
-            status: g.pago ? 'Pago' : 'Programado'
+            status: (g.pago||g.valor>0) ? 'Pago' : (g.historico ? 'Lançamento antigo' : 'Programado')
           });
         });
       });
