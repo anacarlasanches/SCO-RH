@@ -476,16 +476,8 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
     <div id="rescisao-nome" style="font-size:15px;font-weight:700;color:var(--sco-azul);margin-bottom:16px;"></div>
     <div class="form-grid">
       <div class="form-group"><label>Data de demissão *</label><input type="date" id="res-data"/></div>
-      <div class="form-group"><label>Tipo de rescisão *</label>
-        <select id="res-tipo">
-          <option value="">Selecione...</option>
-          <option value="Aviso indenizado pela empresa">Aviso indenizado pela empresa</option>
-          <option value="Aviso trabalhado pela empresa">Aviso trabalhado pela empresa</option>
-          <option value="Pedido de demissão trabalhado">Pedido de demissão trabalhado</option>
-          <option value="Pedido de demissão indenizado">Pedido de demissão indenizado</option>
-          <option value="Demissão por justa causa">Demissão por justa causa</option>
-          <option value="Distrato">Distrato</option>
-        </select>
+      <div class="form-group"><label>Motivo / tipo do desligamento *</label>
+        <select id="res-tipo"><option value="">Selecione...</option></select>
       </div>
       <div class="form-group"><label>Valor da rescisão (R$)</label><input type="number" id="res-valor" step="0.01" placeholder="0.00"/></div>
       <div class="form-group"><label>FGTS rescisório (R$)</label><input type="number" id="res-fgts" step="0.01" placeholder="0.00"/></div>
@@ -739,7 +731,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
         </select>
         <select id="func-filtro-status" onchange="renderFuncionarios()" style="padding:7px 10px;border:1px solid #d5daea;border-radius:8px;font-size:13px;" title="Filtrar por status">
           <option value="ativo">Ativos</option>
-          <option value="inativo">Inativos</option>
+          <option value="inativo">Desligados</option>
           <option value="">Todos</option>
         </select>
         <button class="btn btn-sm btn-outline" onclick="limparFiltrosFuncs()" title="Limpar filtros">✕ Limpar</button>
@@ -979,27 +971,20 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
 <div class="detail-overlay" id="modal-desativar" onclick="if(event.target===this)fecharDesativar()">
   <div class="detail-modal" style="width:560px;max-width:95vw;">
     <div class="modal-header">
-      <h2>🚫 Desativar funcionário</h2>
+      <h2>🚫 Desligar funcionário</h2>
       <button class="btn btn-sm" onclick="fecharDesativar()" style="color:#888;">✕</button>
     </div>
     <div id="desativar-nome" style="font-size:15px;font-weight:700;color:var(--sco-azul);margin-bottom:16px;"></div>
     <div class="form-grid">
       <div class="form-group"><label>Data de demissão *</label><input type="date" id="dem-data"/></div>
-      <div class="form-group"><label>Tipo de rescisão *</label>
-        <select id="dem-tipo">
-          <option value="">Selecione...</option>
-          <option value="Aviso indenizado pela empresa">Aviso indenizado pela empresa</option>
-          <option value="Aviso trabalhado pela empresa">Aviso trabalhado pela empresa</option>
-          <option value="Pedido de demissão trabalhado">Pedido de demissão trabalhado</option>
-          <option value="Pedido de demissão não trabalhado">Pedido de demissão não trabalhado</option>
-          <option value="Término de contrato">Término de contrato</option>
-        </select>
+      <div class="form-group"><label>Motivo / tipo do desligamento *</label>
+        <select id="dem-tipo"><option value="">Selecione...</option></select>
       </div>
       <div class="form-group"><label>Valor da rescisão (R$)</label><input type="number" id="dem-valor" placeholder="0,00"/></div>
       <div class="form-group"><label>FGTS rescisório (R$)</label><input type="number" id="dem-fgts" placeholder="0,00"/></div>
     </div>
     <div class="btn-actions" style="margin-top:16px;">
-      <button class="btn btn-danger" onclick="confirmarDesativar()">🚫 Confirmar desativação</button>
+      <button class="btn btn-danger" onclick="confirmarDesativar()">🚫 Confirmar desligamento</button>
       <button class="btn btn-outline" onclick="fecharDesativar()">✕ Cancelar</button>
     </div>
   </div>
@@ -1828,13 +1813,35 @@ function fecharEditFunc(){
 
 let desativarFuncId = null;
 
+// ===== MOTIVOS DE DESLIGAMENTO (lista única usada em Desativar e em Lançar/Editar Rescisão) =====
+var MOTIVOS_DESLIGAMENTO=[
+  {grupo:'Iniciativa da empresa',itens:['Dispensa sem justa causa — aviso indenizado','Dispensa sem justa causa — aviso trabalhado','Dispensa por justa causa','Término do contrato de experiência','Rescisão antecipada da experiência — pela empresa']},
+  {grupo:'Iniciativa do colaborador',itens:['Pedido de demissão — aviso trabalhado','Pedido de demissão — aviso indenizado / dispensado do aviso','Rescisão antecipada da experiência — pelo colaborador','Rescisão indireta']},
+  {grupo:'Outros',itens:['Acordo entre as partes (art. 484-A)','Término de contrato por prazo determinado','Aposentadoria','Falecimento','Encerramento de contrato PJ / Distrato']}
+];
+function preencherMotivosDesligamento(selId,valorAtual){
+  var sel=document.getElementById(selId);if(!sel)return;
+  var todos=[];MOTIVOS_DESLIGAMENTO.forEach(function(g){todos=todos.concat(g.itens);});
+  var esc=function(t){return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');};
+  var html='<option value="">Selecione...</option>';
+  // Motivo antigo (de antes da lista nova): continua aparecendo até ser trocado
+  if(valorAtual&&todos.indexOf(valorAtual)<0){
+    html+='<optgroup label="Motivo registrado anteriormente"><option value="'+esc(valorAtual)+'">'+esc(valorAtual)+' (antigo)</option></optgroup>';
+  }
+  MOTIVOS_DESLIGAMENTO.forEach(function(g){
+    html+='<optgroup label="'+esc(g.grupo)+'">'+g.itens.map(function(i){return '<option value="'+esc(i)+'">'+esc(i)+'</option>';}).join('')+'</optgroup>';
+  });
+  sel.innerHTML=html;
+  sel.value=valorAtual||'';
+}
+
 function desativarFuncionario(id){
   const f = funcionarios.find(f=>f.id===id);
   if(!f) return;
   desativarFuncId = id;
   document.getElementById('desativar-nome').textContent = f.nome + ' — ' + f.cargo;
   document.getElementById('dem-data').value = new Date().toISOString().split('T')[0];
-  document.getElementById('dem-tipo').value = '';
+  preencherMotivosDesligamento('dem-tipo','');
   document.getElementById('dem-valor').value = '';
   document.getElementById('dem-fgts').value = '';
   document.getElementById('modal-desativar').classList.add('open');
@@ -1857,7 +1864,7 @@ function confirmarDesativar(){
   save();
   renderFuncionarios();
   fecharDesativar();
-  toast('Funcionário desativado.');
+  toast('Funcionário desligado.');
   if(_funcDesligadaId) setTimeout(function(){abrirChecklistDesligamento(_funcDesligadaId);},400);
 }
 
@@ -1931,10 +1938,10 @@ function renderFuncionarios(){
   tbody.innerHTML=lista.map(function(f){
     const i=funcionarios.indexOf(f);
     const inativo=f.ativo===false;
-    const badgeInativo=inativo?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px;">Inativo</span>':'';
+    const badgeInativo=inativo?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px;">Desligado</span>':'';
     const btnStatus=inativo
       ?'<button class="btn btn-sm" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;" onclick="reativarFuncionario(\''+f.id+'\')">✅ Reativar</button>'
-      :'<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;" onclick="desativarFuncionario(\''+f.id+'\')">🚫 Desativar</button>';
+      :'<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;" onclick="desativarFuncionario(\''+f.id+'\')">🚫 Desligar</button>';
     return '<tr>'
       +'<td style="'+(inativo?'opacity:0.55':'')+'"><div class="func-info">'
       +'<div class="avatar" style="background:'+avatarColor(i)+'">'+initials(f.nome)+'</div>'
@@ -5902,12 +5909,17 @@ function exportarFuncionariosExcel(){
     return f.ativo!==false;
   }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   var nomeFiltro=filtro==='desligados'?'Desligados':filtro==='todos'?'Todos':'Ativos';
-  var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status','Data Desligamento']];
+  var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status','Data Desligamento','Motivo do Desligamento']];
   var _semSal=ehAssistente();
-  list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?'Inativo':'Ativo',f.dataDesligamento||'']);});
+  list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?'Desligado':'Ativo',
+    f.ativo===false?fmtData((f.demissao&&f.demissao.data)||f.dataDesligamento||''):'',
+    f.ativo===false?((f.demissao&&f.demissao.tipo)||''):'']);});
   if(_semSal) rows=rows.map(function(r){return r.filter(function(_,i){return i!==5;});});
   var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);
-  XLSX.utils.book_append_sheet(wb,ws,'Funcionarios');XLSX.writeFile(wb,'SCO_Funcionarios_'+nomeFiltro+'.xlsx');
+  ws['!cols']=rows[0].map(function(h){return {wch:h==='Motivo do Desligamento'?44:h==='Nome'?32:16};});
+  XLSX.utils.book_append_sheet(wb,ws,'Funcionarios');
+  var _bin=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  baixarArquivo(new Blob([_bin],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'SCO_Funcionarios_'+nomeFiltro+'.xlsx');
   toast('Excel exportado com '+list.length+' funcionario(s) — '+nomeFiltro+'!');
 }
 
@@ -5917,7 +5929,7 @@ function exportarFuncionariosPDF(){
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Funcionarios</title><style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px;}table{width:100%;border-collapse:collapse;}th{background:#11205b;color:#fff;padding:6px;}td{padding:5px;border-bottom:1px solid #eee;}@media print{button{display:none;}}</style></head><body>';
   html+='<h2>Funcionarios - SCO</h2><button onclick="window.print()">Imprimir</button>';
   html+='<table><tr><th>#</th><th>Nome</th><th>Cargo</th><th>Depto</th><th>Tipo</th><th>Admissao</th><th>Status</th><th>Dt. Desligamento</th></tr>';
-  html+=list.map(function(f,i){return '<tr><td>'+(i+1)+'</td><td>'+f.nome+'</td><td>'+f.cargo+'</td><td>'+(f.depto||'-')+'</td><td>'+(f.tipo||'CLT')+'</td><td>'+(f.admissao||'-')+'</td><td>'+(f.ativo===false?'Inativo':'Ativo')+'</td><td>'+((f.demissao&&f.demissao.data)||'')+'</td></tr>';}).join('');
+  html+=list.map(function(f,i){return '<tr><td>'+(i+1)+'</td><td>'+f.nome+'</td><td>'+f.cargo+'</td><td>'+(f.depto||'-')+'</td><td>'+(f.tipo||'CLT')+'</td><td>'+(f.admissao||'-')+'</td><td>'+(f.ativo===false?'Desligado':'Ativo')+'</td><td>'+((f.demissao&&f.demissao.data)||'')+'</td></tr>';}).join('');
   html+='</table></body></html>';
   win.document.write(html);win.document.close();
 }
@@ -7343,7 +7355,7 @@ function abrirRescisao(funcId){
   _rescisaoFuncId = funcId;
   document.getElementById('rescisao-nome').textContent = f.nome + ' — ' + (f.cargo||'');
   document.getElementById('res-data').value = (f.demissao&&f.demissao.data)||'';
-  document.getElementById('res-tipo').value = (f.demissao&&f.demissao.tipo)||'';
+  preencherMotivosDesligamento('res-tipo',(f.demissao&&f.demissao.tipo)||'');
   document.getElementById('res-valor').value = (f.demissao&&f.demissao.valor)||'';
   document.getElementById('res-fgts').value = (f.demissao&&f.demissao.fgtsRescisorio)||'';
   document.getElementById('modal-rescisao').style.display='flex';
@@ -7359,14 +7371,16 @@ function salvarRescisao(){
   if(!data||!tipo){toast('Preencha data e tipo de rescisão.');return;}
   var idx = funcionarios.findIndex(function(x){return x.id===_rescisaoFuncId;});
   if(idx<0) return;
-  funcionarios[idx].demissao = {
+  funcionarios[idx].demissao = Object.assign({}, funcionarios[idx].demissao||{}, {
     data: data,
     tipo: tipo,
     valor: parseFloat(document.getElementById('res-valor').value)||0,
     fgtsRescisorio: parseFloat(document.getElementById('res-fgts').value)||0
-  };
+  });
   save();
   fecharRescisao();
+  try{renderFuncionarios();}catch(e){}
+  try{renderRH();}catch(e){}
   toast('✅ Rescisão salva!');
 }
 
