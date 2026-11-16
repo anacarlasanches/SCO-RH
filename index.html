@@ -1525,7 +1525,7 @@ function goTo(page,el){
   if(page==='planilha'){document.getElementById('plan-mes').value=new Date().getMonth()+1;}
   if(page==='importar-enc'){encPdfDados={};}
   if(page==='rh') renderRH();
-  if(page==='alertas') renderAlertas();
+  if(page==='alertas'){ renderAlertas(); _atualizarChecklistsDaNuvem().then(function(){ try{renderAlertas();}catch(e){} }); }
   if(page==='ferias-ctrl') renderFeriasCtrl();
   if(page==='vt-vr'){renderHistoricoVTVR();renderHistoricoCartoes();}
   if(page==='historico'){
@@ -1865,7 +1865,13 @@ function confirmarDesativar(){
   renderFuncionarios();
   fecharDesativar();
   toast('Funcionário desligado.');
-  if(_funcDesligadaId) setTimeout(function(){abrirChecklistDesligamento(_funcDesligadaId);},400);
+  if(_funcDesligadaId){
+    if(!getChecklistFunc(_funcDesligadaId,'desligamento')){
+      var _tplD=(getChecklistTemplates()['desligamento']||[]).map(function(label){return {label:label,done:false};});
+      if(_tplD.length) saveChecklistFunc(_funcDesligadaId,'desligamento',_tplD);
+    }
+    setTimeout(function(){abrirChecklistDesligamento(_funcDesligadaId);},400);
+  }
 }
 
 function fecharDesativar(){
@@ -3730,6 +3736,32 @@ function renderAlertas(){
   const el = document.getElementById('alertas-body');
   if(!el) return;
   let html = '';
+
+  // 0. Checklists de desligamento pendentes
+  (function(){
+    var prog=getChecklistProgresso();
+    var pend=Object.keys(prog).filter(function(k){return prog[k]&&prog[k].tipo==='desligamento';}).map(function(k){
+      var fid=k.slice(0,k.length-'_desligamento'.length);
+      var f=funcionarios.find(function(x){return x.id===fid;});
+      if(!f)return null;
+      var it=prog[k].items||[];var feitos=it.filter(function(i){return i.done;}).length;
+      return {f:f,feitos:feitos,total:it.length};
+    }).filter(Boolean).sort(function(a,b){return ((b.f.demissao&&b.f.demissao.data)||'').localeCompare((a.f.demissao&&a.f.demissao.data)||'');});
+    if(!pend.length)return;
+    html+='<div class="card" style="border-left:4px solid #dc2626;margin-bottom:14px;">'
+      +'<div class="card-title"><span class="dot" style="background:#dc2626;"></span>📋 Checklists de desligamento pendentes — '+pend.length+'</div>'
+      +pend.map(function(p){
+        var pct=p.total?Math.round(p.feitos/p.total*100):0;
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f3f9;flex-wrap:wrap;">'
+          +'<div style="flex:1;min-width:180px;"><div style="font-weight:700;font-size:13px;">'+p.f.nome+'</div>'
+          +'<div style="font-size:11px;color:#888;">'+(p.f.cargo||'')+(p.f.demissao&&p.f.demissao.data?' · desligado em '+fmtData(p.f.demissao.data):'')+'</div></div>'
+          +'<div style="width:140px;"><div style="height:6px;background:#f1f3f9;border-radius:4px;overflow:hidden;"><div style="height:6px;width:'+pct+'%;background:#f94603;"></div></div>'
+          +'<div style="font-size:11px;color:#666;margin-top:3px;">'+p.feitos+' de '+p.total+' tarefas</div></div>'
+          +'<button class="btn btn-sm btn-orange" onclick="abrirChecklistPendente(\''+p.f.id+'\')">✅ Abrir checklist</button>'
+          +'</div>';
+      }).join('')
+      +'</div>';
+  })();
 
   // 1. Vencimento de experiência (45 e 90 dias)
   const alertasExp = [];
@@ -7170,8 +7202,7 @@ function getChecklistFunc(funcId, tipo){
   var key = funcId+'_'+tipo;
   return prog[key]||null;
 }
-function saveChecklistFunc(funcId, tipo, items){
-  var prog = getChecklistProgresso();
+function _aplicarChecklist(prog, funcId, tipo, items){
   var key = funcId+'_'+tipo;
   var total = items.length;
   var feitos = items.filter(function(i){return i.done;}).length;
@@ -7180,7 +7211,31 @@ function saveChecklistFunc(funcId, tipo, items){
   } else {
     prog[key] = {tipo:tipo, items:items, atualizado:new Date().toISOString()};
   }
-  saveChecklistProgresso(prog);
+  return prog;
+}
+function saveChecklistFunc(funcId, tipo, items){
+  // Grava na hora neste navegador
+  var prog = _aplicarChecklist(getChecklistProgresso(), funcId, tipo, items);
+  localStorage.setItem('rt_checklist_progresso', JSON.stringify(prog));
+  // Na nuvem: busca a versão mais recente e altera só este checklist (não apaga o de outras pessoas)
+  try{
+    supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').maybeSingle().then(function(r){
+      var remoto = (r && r.data && r.data.valor) ? r.data.valor : getChecklistProgresso();
+      var final = _aplicarChecklist(remoto, funcId, tipo, items);
+      localStorage.setItem('rt_checklist_progresso', JSON.stringify(final));
+      return supa.from('configuracoes').upsert([{chave:'checklist_progresso',valor:final}]);
+    }).then(function(r2){
+      if(r2 && r2.error) toast('⚠️ Checklist salvo só neste navegador — não consegui salvar na nuvem.', false);
+    });
+  }catch(e){ saveChecklistProgresso(prog); }
+}
+// Busca a versão mais recente dos checklists antes de abrir
+function _atualizarChecklistsDaNuvem(){
+  try{
+    return supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').maybeSingle().then(function(r){
+      if(r && r.data && r.data.valor) localStorage.setItem('rt_checklist_progresso', JSON.stringify(r.data.valor));
+    }).catch(function(){});
+  }catch(e){ return Promise.resolve(); }
 }
 
 function funcTemChecklistPendente(funcId){
@@ -7219,6 +7274,9 @@ function abrirChecklistDesligamento(funcId){
 
 // Botão para abrir checklist pendente de um funcionário
 function abrirChecklistPendente(funcId){
+  _atualizarChecklistsDaNuvem().then(function(){ _abrirChecklistPendenteLocal(funcId); });
+}
+function _abrirChecklistPendenteLocal(funcId){
   var prog = getChecklistProgresso();
   var tipos = ['desligamento','admissao_CLT','admissao_PJ'];
   for(var i=0;i<tipos.length;i++){
@@ -7268,6 +7326,7 @@ function fecharChecklist(){
   document.getElementById('modal-checklist').style.display='none';
   // Atualizar lista de funcionários para refletir ícone de alerta
   try{renderFuncionarios();}catch(e){}
+  try{renderAlertas();}catch(e){}
   _checklistAtual = null;
 }
 
