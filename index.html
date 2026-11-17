@@ -254,14 +254,6 @@ body.perfil-assistente .so-admin{display:none!important;}
 body.perfil-assistente #page-rh table th:nth-child(n+5),
 body.perfil-assistente #page-rh table td:nth-child(n+5),
 body.perfil-assistente #page-rh tr.rh-total{display:none!important;}
-body.perfil-assistente #page-ferias-ctrl .fer-np-btn,
-body.perfil-assistente #page-ferias-ctrl .fer-gozo-btn,
-body.perfil-assistente #page-ferias-ctrl .fer-gozo-per-btn,
-body.perfil-assistente #page-ferias-ctrl .fer-edit-periodo-btn,
-body.perfil-assistente #page-ferias-ctrl .fer-rm-periodo-btn,
-body.perfil-assistente #page-ferias-ctrl .fer-pagar-btn,
-body.perfil-assistente #page-ferias-ctrl .fer-edit-gozo-btn,
-body.perfil-assistente #page-ferias-ctrl .rm-gozo-btn{display:none!important;}
 .perfil-badge{display:none;}
 body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;color:#c2410c;border:1px solid #fdba74;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;margin-left:8px;}
 </style>
@@ -1212,7 +1204,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
       <option value="2026" selected>2026</option>
       <option value="2027">2027</option>
     </select>
-    <button class="btn btn-orange so-admin" onclick="abrirModalProgramarFerias()">🏖️ Programar Férias</button>
+    <button class="btn btn-orange" onclick="abrirModalProgramarFerias()">🏖️ Programar Férias</button>
     <button class="btn btn-sm" onclick="abrirModalRelatorioFerias()" style="background:#16a34a;color:#fff;">📊 Relatório Excel/PDF</button>
   </div>
   <div id="fer-aviso-sem-periodo"></div>
@@ -4309,7 +4301,7 @@ function renderAvisoSemPeriodo(){
     .sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   if(!lista.length){el.innerHTML='';return;}
   var h=new Date();var umAnoAtras=new Date(h.getFullYear()-1,h.getMonth(),h.getDate());
-  var podeAbrir=!ehAssistente();
+  var podeAbrir=true;
   el.innerHTML='<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:14px;">'
     +'<div class="card-title"><span class="dot" style="background:#f59e0b;"></span>⚠️ CLT ativos sem período aquisitivo — '+lista.length+' funcionário(s)</div>'
     +'<div style="font-size:12px;color:#666;margin-bottom:8px;">'+(podeAbrir
@@ -4335,7 +4327,6 @@ function renderAvisoSemPeriodo(){
     +'</div>';
 }
 function abrirPeriodosSelecionados(){
-  if(ehAssistente()){toast('🔒 Seu perfil não tem permissão para esta ação.',false);return;}
   var ids=[].slice.call(document.querySelectorAll('.sp-ck:checked')).map(function(c){return c.value;});
   if(!ids.length){toast('Marque ao menos um funcionário.',false);return;}
   var fs=ids.map(function(id){return funcionarios.find(function(x){return x.id===id;});}).filter(Boolean);
@@ -6798,9 +6789,8 @@ var PAGINAS_BLOQUEADAS_ASSISTENTE=['dashboard','relatorio','lancamento','histori
 // Ações de escrita bloqueadas para o assistente (abas "só ver" e funções só da coordenação)
 var ACOES_BLOQUEADAS_ASSISTENTE=[
   'editarFuncionario','salvarEditFunc','desativarFuncionario','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
-  'abrirModalProgramarFerias','salvarProgramacaoFerias','abrirModalNovoPeriodo','salvarNovoPeriodo','abrirModalPagarFerias','salvarPagamentoFerias',
-  'abrirLancarFeriasPeriodo','abrirLancarFerias','confirmarLancarFerias','editarGozo','salvarEditGozo','removerGozo','abrirNovoPeriodo','confirmarNovoPeriodo',
-  'confirmarFerias','cancelarFerias','abrirPeriodosSelecionados','marcarGozoHistorico','editarPeriodo','excluirPeriodo','handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
+  // Aba Férias: liberada por completo para o assistente. Importações de férias continuam só na coordenação.
+  'handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
   'salvarMeta','removerMeta','importarMetasPlanilha',
   'abrirModalAvaliacao','editarAvaliacao','salvarAvaliacao','excluirAvaliacao','importarAvaliacoesXLSX','importarAvaliacaoXLSX','verDetalhesAvaliacao',
   'exportarDados','exportarDadosComLog','importarDados','abrirModalLancamento','salvarLancamento','editarLancamento','openModal'
