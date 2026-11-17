@@ -1686,7 +1686,7 @@ function verFuncionario(id){
     if(funcTemChecklistPendente(f.id)){
       html += '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="closeModal();setTimeout(function(){abrirChecklistPendente(\''+f.id+'\');},200);">⚠️ Ver Checklist Pendente</button>';
     }
-    if(f.ativo===false && !ehAssistente()){
+    if(f.ativo===false && !ehAssistente() && !_ehAutonomoFunc(f)){
       html += '<button class="btn btn-sm btn-orange" onclick="closeModal();setTimeout(function(){abrirRescisao(\''+f.id+'\');},200);">💰 Lançar/Editar Rescisão</button>';
     }
     html += '</div>';
@@ -1871,12 +1871,26 @@ function fecharDesativar(){
   desativarFuncId = null;
 }
 
+// Autônomos/freelancers: desativar sem data, valor, motivo ou checklist de desligamento
+function _ehAutonomoFunc(f){
+  var t=String((f&&f.tipo)||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return t.indexOf('AUTONOMO')===0||t.indexOf('FREELA')===0;
+}
+function desativarAutonomo(id){
+  var idx=funcionarios.findIndex(function(f){return f.id===id;});if(idx<0)return;
+  if(!confirm('Desativar '+funcionarios[idx].nome+'?\n\nEle(a) sai da lista de ativos. Dá para reativar quando quiser.'))return;
+  funcionarios[idx].ativo=false;
+  var h=new Date();funcionarios[idx].desativadoEm=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
+  save();renderFuncionarios();
+  toast('⏸️ '+funcionarios[idx].nome.split(' ')[0]+' desativado(a).');
+}
 function reativarFuncionario(id){
   if(!confirm('Reativar este funcionário?')) return;
   const idx = funcionarios.findIndex(f=>f.id===id);
   if(idx<0) return;
   funcionarios[idx].ativo = true;
   delete funcionarios[idx].demissao;
+  delete funcionarios[idx].desativadoEm;
   save();
   renderFuncionarios();
   toast('Funcionário reativado!');
@@ -1936,10 +1950,13 @@ function renderFuncionarios(){
   tbody.innerHTML=lista.map(function(f){
     const i=funcionarios.indexOf(f);
     const inativo=f.ativo===false;
-    const badgeInativo=inativo?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px;">Desligado</span>':'';
+    const _aut=_ehAutonomoFunc(f);
+    const badgeInativo=inativo?'<span class="badge badge-gray" style="font-size:10px;margin-left:4px;">'+(_aut?'Desativado':'Desligado')+'</span>':'';
     const btnStatus=inativo
       ?'<button class="btn btn-sm" style="background:#dcfce7;color:#16a34a;border:1px solid #86efac;" onclick="reativarFuncionario(\''+f.id+'\')">✅ Reativar</button>'
-      :'<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;" onclick="desativarFuncionario(\''+f.id+'\')">🚫 Desligar</button>';
+      :_aut
+        ?'<button class="btn btn-sm" style="background:#f8fafc;color:#475569;border:1px solid #cbd5e1;" onclick="desativarAutonomo(\''+f.id+'\')">⏸️ Desativar</button>'
+        :'<button class="btn btn-sm" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;" onclick="desativarFuncionario(\''+f.id+'\')">🚫 Desligar</button>';
     return '<tr>'
       +'<td style="'+(inativo?'opacity:0.55':'')+'"><div class="func-info">'
       +'<div class="avatar" style="background:'+avatarColor(i)+'">'+initials(f.nome)+'</div>'
@@ -5973,8 +5990,8 @@ function exportarFuncionariosExcel(){
   var nomeFiltro=filtro==='desligados'?'Desligados':filtro==='todos'?'Todos':'Ativos';
   var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status','Data Desligamento','Motivo do Desligamento']];
   var _semSal=ehAssistente();
-  list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?'Desligado':'Ativo',
-    f.ativo===false?fmtData((f.demissao&&f.demissao.data)||f.dataDesligamento||''):'',
+  list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?(_ehAutonomoFunc(f)?'Desativado':'Desligado'):'Ativo',
+    f.ativo===false?fmtData((f.demissao&&f.demissao.data)||f.desativadoEm||f.dataDesligamento||''):'',
     f.ativo===false?((f.demissao&&f.demissao.tipo)||''):'']);});
   if(_semSal) rows=rows.map(function(r){return r.filter(function(_,i){return i!==5;});});
   var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(rows);
@@ -6827,7 +6844,7 @@ var _perfilAtual='assistente'; // começa restrito até confirmar o login
 var PAGINAS_BLOQUEADAS_ASSISTENTE=['dashboard','relatorio','lancamento','historico','relatorios','importacoes','planilha','importar-enc','configuracoes'];
 // Ações de escrita bloqueadas para o assistente (abas "só ver" e funções só da coordenação)
 var ACOES_BLOQUEADAS_ASSISTENTE=[
-  'editarFuncionario','salvarEditFunc','desativarFuncionario','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
+  'editarFuncionario','salvarEditFunc','desativarFuncionario','desativarAutonomo','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
   // Aba Férias: liberada por completo para o assistente. Importações de férias continuam só na coordenação.
   'handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
   'salvarMeta','removerMeta','importarMetasPlanilha',
