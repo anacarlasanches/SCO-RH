@@ -2954,15 +2954,20 @@ function renderDashboard(){
   // Gráfico por tipo de contratação
   const byTipo={};
   const countTipo={};
+  const _compTipo={};
   dados.forEach(function(l){
     const f=funcionarios.find(function(f){return f.id===l.funcId;});
-    const tp=(f&&f.tipo)?f.tipo.toUpperCase():'CLT';
+    // Normaliza o tipo (Autônomo/AUTONOMO/autônomo viram um só)
+    const _t=String((f&&f.tipo)||'CLT').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    const tp=_t==='PJ'?'PJ':(_t.indexOf('AUTONOMO')===0||_t.indexOf('FREELA')===0)?'Autônomo':_t==='CLT'?'CLT':(f&&f.tipo)||'CLT';
     byTipo[tp]=(byTipo[tp]||0)+l.total;
+    _compTipo[tp]=_compTipo[tp]||{};_compTipo[tp][l.funcId]=(_compTipo[tp][l.funcId]||0)+l.total;
     countTipo[tp]=(countTipo[tp]||new Set());
     countTipo[tp].add(l.funcId);
   });
-  const tipoColors={'CLT':'#11205b','PJ':'#f94603','AUTÔNOMO':'#1a2f80','AUTONOMO':'#1a2f80'};
-  const tipoLabels=Object.keys(byTipo);
+  const tipoColors={'CLT':'#11205b','PJ':'#f94603','Autônomo':'#0ea5a4','Freelancer':'#a855f7'};
+  const _ordemTipo=['CLT','PJ','Autônomo','Freelancer'];
+  const tipoLabels=Object.keys(byTipo).sort(function(a,b){var x=_ordemTipo.indexOf(a),y=_ordemTipo.indexOf(b);return (x<0?9:x)-(y<0?9:y);});
   const tipoVals=tipoLabels.map(t=>byTipo[t]);
   const tipoChartExist=Chart.getChart('chartTipoContrat');
   if(tipoChartExist)tipoChartExist.destroy();
@@ -2980,8 +2985,12 @@ function renderDashboard(){
       options:{
         responsive:true,maintainAspectRatio:false,
         plugins:{
-          legend:{position:'bottom',labels:{font:{size:12},padding:12}},
-          tooltip:{callbacks:{label:function(ctx){return ' '+ctx.label+': '+fmt(ctx.raw)+' ('+((ctx.raw/tipoVals.reduce((a,b)=>a+b,0))*100).toFixed(1)+'%)';}}}
+          legend:{position:'bottom',labels:{font:{size:12},padding:12,generateLabels:function(ch){
+            var tot=tipoVals.reduce(function(a,b){return a+b;},0)||1;
+            return ch.data.labels.map(function(lb,i){return {text:lb+' — '+fmt(tipoVals[i])+' ('+(tipoVals[i]/tot*100).toFixed(0)+'%)',fillStyle:ch.data.datasets[0].backgroundColor[i],strokeStyle:'#fff',lineWidth:0,hidden:!ch.getDataVisibility(i),index:i};});
+          }}},
+          tooltip:{callbacks:{label:function(ctx){return ' '+ctx.label+': '+fmt(ctx.raw)+' ('+((ctx.raw/tipoVals.reduce((a,b)=>a+b,0))*100).toFixed(1)+'%)';},
+            afterLabel:function(ctx){return ['Quem compõe:'].concat(_linhasComposicao(_compTipo[ctx.label]));}}}
         },
         cutout:'60%'
       }
@@ -4939,6 +4948,29 @@ function filtrarLancsRelatorio(mes,ano){
     return true;
   });
 }
+// Linhas "quem compõe" para os tooltips dos gráficos
+function _linhasComposicao(mapaFunc,max){
+  max=max||12;
+  var arr=Object.keys(mapaFunc||{}).map(function(fid){
+    var f=funcionarios.find(function(x){return x.id===fid;});
+    return [(f?f.nome:'(funcionário excluído)'),mapaFunc[fid]];
+  }).sort(function(a,b){return b[1]-a[1];});
+  var out=arr.slice(0,max).map(function(e){return '  • '+e[0]+': '+fmt(e[1]);});
+  if(arr.length>max)out.push('  … e mais '+(arr.length-max)+' pessoa(s)');
+  return out;
+}
+// NF PJ/Autônomo: separa pelo tipo do funcionário (só nos relatórios; os lançamentos não mudam)
+// Pagamentos (Líquido Salário e NF) separados pelo tipo de contratação do funcionário
+function _chaveCampoRel(campo,funcId){
+  if(campo!=='l-nf-pj'&&campo!=='l-liquido')return campo;
+  var f=funcionarios.find(function(x){return x.id===funcId;});
+  var t=String((f&&f.tipo)||'CLT').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  if(t==='PJ')return 'pag-pj';
+  // Autônomo e freelancer são a mesma categoria
+  if(t.indexOf('AUTONOMO')===0||t.indexOf('FREELA')===0)return 'pag-aut';
+  return 'pag-clt';
+}
+var LABELS_PAGAMENTO={'pag-clt':'Salário CLT','pag-pj':'Pagamento PJ','pag-aut':'Pagamento Autônomo'};
 function renderRelatorios(){
   var mes=(document.getElementById('rel2-mes')||{value:'all'}).value;
   var ano=parseInt((document.getElementById('rel2-ano')||{value:'2026'}).value);
@@ -4952,7 +4984,7 @@ function renderRelatorios(){
 
   // Mapeamento campo -> label
   var labels={
-    'l-liquido':'Líquido Salário','l-nf-pj':'NF PJ/Autônomo',
+    'l-liquido':'Líquido Salário','l-nf-pj':'NF PJ',
     'l-fgts':'FGTS','l-inss':'INSS Empregador',
     'l-decimo':'13º','l-ferias':'Férias',
     'l-adiantamento':'Adiantamento','l-outros-folha':'Outros Folha',
@@ -4965,13 +4997,16 @@ function renderRelatorios(){
     'l-bonus-aniv':'Bônus Aniversário','l-premiacao':'Premiação',
     'l-outros-extras':'Outros Extras'
   };
+  Object.assign(labels,LABELS_PAGAMENTO);
 
   // Somar por campo
   var totais={};
+  var _compBen={};
   dados.forEach(function(l){
     Object.keys(l.dados||{}).forEach(function(campo){
       var v=l.dados[campo]||0;
-      if(v>0) totais[campo]=(totais[campo]||0)+v;
+      var k=_chaveCampoRel(campo,l.funcId);
+      if(v>0){ totais[k]=(totais[k]||0)+v; _compBen[k]=_compBen[k]||{}; _compBen[k][l.funcId]=(_compBen[k][l.funcId]||0)+v; }
     });
   });
 
@@ -5005,7 +5040,7 @@ function renderRelatorios(){
         labels:itens.map(function(e){return labels[e[0]]||e[0];}),
         datasets:[{
           data:itens.map(function(e){return e[1];}),
-          backgroundColor:itens.map(function(_,i){return cores[i%cores.length];}),
+          backgroundColor:itens.map(function(e,i){var cp={'pag-clt':'#11205b','pag-pj':'#f94603','pag-aut':'#0ea5a4','pag-freela':'#a855f7'};return cp[e[0]]||cores[i%cores.length];}),
           borderRadius:5,borderSkipped:false
         }]
       },
@@ -5013,7 +5048,8 @@ function renderRelatorios(){
         responsive:true,maintainAspectRatio:false,
         plugins:{
           legend:{display:false},
-          tooltip:{callbacks:{label:function(ctx){return ' '+fmt(ctx.raw);}}}
+          tooltip:{callbacks:{label:function(ctx){return ' '+fmt(ctx.raw);},
+            afterLabel:function(ctx){return ['Quem compõe:'].concat(_linhasComposicao(_compBen[itens[ctx.dataIndex][0]]));}}}
         },
         scales:{
           x:{ticks:{font:{size:10},maxRotation:35},grid:{display:false}},
@@ -5057,10 +5093,12 @@ function exportarRelatoriosExcel(){
     'l-consignado':'Consignado','l-payday':'Payday','l-convenio-araujo':'Convênio Araújo',
     'l-outros-benef':'Outros Benefícios','l-metas':'Metas','l-bonus-aniv':'Bônus Aniversário',
     'l-premiacao':'Premiação','l-outros-extras':'Outros Extras'};
+  Object.assign(labels,LABELS_PAGAMENTO);
   var totais={};
   dados.forEach(function(l){
     Object.keys(l.dados||{}).forEach(function(c){
-      if((l.dados[c]||0)>0)totais[c]=(totais[c]||0)+l.dados[c];
+      var k=_chaveCampoRel(c,l.funcId);
+      if((l.dados[c]||0)>0)totais[k]=(totais[k]||0)+l.dados[c];
     });
   });
   var itens=Object.entries(totais).sort(function(a,b){return b[1]-a[1];});
@@ -5072,7 +5110,8 @@ function exportarRelatoriosExcel(){
   var ws=XLSX.utils.aoa_to_sheet(rows);
   ws['!cols']=[{wch:30},{wch:15},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws,'Benefícios');
-  XLSX.writeFile(wb,'SCO_Relatorio_Beneficios_'+ano+(mes!=='all'?'_'+MESES[parseInt(mes)]:'')+'.xlsx');
+  var _binB=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  baixarArquivo(new Blob([_binB],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'SCO_Relatorio_Beneficios_'+ano+(mes!=='all'?'_'+MESES[parseInt(mes)]:'')+'.xlsx');
   toast('✅ Excel exportado!');
 }
 
