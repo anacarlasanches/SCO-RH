@@ -2755,8 +2755,11 @@ function renderDashboard(){
       return da-db;
     });
 
-    const hoje = new Date().getDate();
-    const anoAtual = new Date().getFullYear();
+    // Usa o ano escolhido no filtro do dashboard (antes usava sempre o ano de hoje)
+    const _agora = new Date();
+    const anoAtual = (ano && !isNaN(ano)) ? ano : _agora.getFullYear();
+    // "Hoje" só é destacado quando o filtro está no mês/ano atuais
+    const hoje = (mesAniv===_agora.getMonth()+1 && anoAtual===_agora.getFullYear()) ? _agora.getDate() : -1;
 
     // Aniversários de nascimento
     let htmlNasc = '';
