@@ -7228,8 +7228,8 @@ function _devPopularSetores(sel,lista){
   sel.innerHTML='<option value="">🏢 Todos os setores</option>'+Object.keys(set).sort(function(a,b){return a.localeCompare(b,'pt-BR');}).map(function(s){return '<option value="'+_devH(s)+'">'+_devH(s)+'</option>';}).join('');
   sel.value=v;
 }
-function _devMetric(label,valor,sub,cor){
-  return '<div class="metric-card"'+(cor?' style="border-left-color:'+cor+';"':'')+'><div class="metric-label">'+label+'</div><div class="metric-value"'+(cor?' style="color:'+cor+';"':'')+'>'+valor+'</div>'+(sub?'<div class="metric-sub">'+sub+'</div>':'')+'</div>';
+function _devMetric(label,valor,sub,cor,clique){
+  return '<div class="metric-card"'+(clique?' onclick="'+clique+'" title="Abrir" ':'')+' style="'+(cor?'border-left-color:'+cor+';':'')+(clique?'cursor:pointer;':'')+'"><div class="metric-label">'+label+'</div><div class="metric-value"'+(cor?' style="color:'+cor+';"':'')+'>'+valor+'</div>'+(sub?'<div class="metric-sub">'+sub+'</div>':'')+'</div>';
 }
 function _devPessoa(f,sub){
   var fi=funcionarios.indexOf(f);
@@ -7266,7 +7266,7 @@ function renderDevCiclo(){
     +_devMetric('👥 Elegíveis',eleg.length,'Ativos fora da experiência')
     +_devMetric('✅ PDIs feitos',feitos.length,pct+'% do ciclo','#16a34a')
     +_devMetric(labPend,pend,'',pend?(st.fase==='encerrado'?'#dc2626':'#f59e0b'):'#16a34a')
-    +_devMetric('🧭 Em experiência',exp.length,'1º PDI no ciclo seguinte','#6366f1')
+    +_devMetric('🧭 Em experiência',exp.length,'ver na aba Experiência 45/90 →','#6366f1',"switchDevTab('exp')")
     +_devMetric('🎯 Média do ciclo',_devNum(media),notas.length?notas.length+' PDI(s)':'',media===null?'':(media>=8?'#16a34a':media>=7.5?'#3b82f6':media>=6?'#f59e0b':'#dc2626'))
     +'</div>'
     +'<div style="height:8px;background:#f1f3f9;border-radius:6px;overflow:hidden;margin:-6px 0 8px;"><div style="height:8px;width:'+pct+'%;background:#16a34a;"></div></div>'
@@ -7293,22 +7293,6 @@ function renderDevCiclo(){
         +'<td style="text-align:center;">'+ev+'</td>'
         +'<td style="text-align:center;">'+(abertasPorFunc[r.f.id]?'<a href="#" onclick="devVerAcoesDe(\''+r.f.id+'\');return false;" style="color:var(--sco-azul);font-weight:700;">'+abertasPorFunc[r.f.id]+'</a>':'<span style="color:#bbb;">0</span>')+'</td>'
         +'<td>'+(r.pdi?'<button class="btn btn-sm btn-outline" title="Ver PDI" onclick="verDetalhesAvaliacao(\''+r.pdi.id+'\')">👁️</button>':'')+'</td></tr>';
-    });
-    h+='</tbody></table></div>';
-  }
-  h+='</div>';
-  // Em experiência
-  h+='<div class="card"><div class="card-title"><span class="dot" style="background:#6366f1;"></span>🧭 Em período de experiência — não fazem PDI neste ciclo ('+exp.length+')</div>';
-  if(!exp.length)h+='<div class="empty" style="padding:18px;">Ninguém em experiência neste ciclo.</div>';
-  else{
-    exp.sort(function(a,b){return a.fimExp-b.fimExp;});
-    h+='<div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Admissão</th><th>Fim da experiência</th><th>Avaliação 45 dias</th><th>Avaliação 90 dias</th><th>1º PDI previsto</th><th></th></tr></thead><tbody>';
-    exp.forEach(function(r){
-      var tem=_devExpEstado(r.f,'45').ev||_devExpEstado(r.f,'90').ev;
-      h+='<tr><td>'+_devPessoa(r.f,_devH(_devSetor(r.f)))+'</td><td>'+fmtData(r.f.admissao)+'</td><td>'+_fmtBR(r.fimExp)+'</td>'
-        +'<td>'+_devExpChip(r.f,'45')+'</td><td>'+_devExpChip(r.f,'90')+'</td>'
-        +'<td>'+(r.proxCiclo?_devBadge('#e0e7ff','#3730a3',_devCicloLabel(r.proxCiclo)):'<span style="font-size:12px;color:#92400e;">cadastre o próximo ciclo</span>')+'</td>'
-        +'<td>'+(tem?'<button class="btn btn-sm btn-outline" title="Ver avaliações de experiência" onclick="devVerAvExp(\''+r.f.id+'\')">👁️</button>':'')+'</td></tr>';
     });
     h+='</tbody></table></div>';
   }
@@ -7360,15 +7344,9 @@ function devExportarCiclo(){
     var nf=r.pdi&&typeof r.pdi.notaFinal==='number'?r.pdi.notaFinal:'',na=r.ant&&typeof r.ant.notaFinal==='number'?r.ant.notaFinal:'';
     rows.push([r.f.nome,_devSetor(r.f),r.f.cargo||'',r.f.tipo||'CLT',DEV_SIT[r.sit].l.replace(/^\S+\s/,''),r.pdi?(r.pdi.dataAv?fmtData(r.pdi.dataAv):_devPeriodoLabel(r.pdi)):'',nf,r.ant?_devPeriodoLabel(r.ant):'',na,(nf!==''&&na!=='')?Math.round((nf-na)*10)/10:'']);
   });
-  var rows2=[['Colaborador','Setor','Admissão','Fim da experiência','Avaliação 45 dias','Avaliação 90 dias','1º PDI previsto']];
-  st.exp.filter(function(r){return !dep||_devSetor(r.f)===dep;}).forEach(function(r){
-    rows2.push([r.f.nome,_devSetor(r.f),fmtData(r.f.admissao),_fmtBR(r.fimExp),_devExpEstado(r.f,'45').texto,_devExpEstado(r.f,'90').texto,r.proxCiclo?_devCicloLabel(r.proxCiclo):'']);
-  });
   var wb=XLSX.utils.book_new();
   var ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:32},{wch:20},{wch:26},{wch:10},{wch:16},{wch:12},{wch:10},{wch:12},{wch:12},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws,'PDI do ciclo');
-  var ws2=XLSX.utils.aoa_to_sheet(rows2);ws2['!cols']=[{wch:32},{wch:20},{wch:12},{wch:16},{wch:34},{wch:24},{wch:16}];
-  XLSX.utils.book_append_sheet(wb,ws2,'Em experiência');
   var bin=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   baixarArquivo(new Blob([bin],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'SCO_Ciclo_PDI_'+_devCicloLabel(m).replace('/','_')+'.xlsx');
   toast('✅ Excel exportado!');
@@ -7411,7 +7389,7 @@ function renderDevExp(){
   lista.forEach(function(r){
     var sit;
     if(r.f.ativo===false)sit=_devBadge('#f1f5f9','#64748b','⚪ Desligado');
-    else if(r.fim&&r.fim>=hoje){var d=Math.round((r.fim-hoje)/864e5);sit=_devBadge('#e0e7ff','#3730a3','🧭 Em experiência')+'<div style="font-size:11px;color:#888;margin-top:3px;">'+(d===0?'termina hoje':'faltam '+d+' dia(s)')+'</div>';}
+    else if(r.fim&&r.fim>=hoje){var d=Math.round((r.fim-hoje)/864e5);sit=_devBadge('#e0e7ff','#3730a3','🧭 Em experiência')+'<div style="font-size:11px;color:#888;margin-top:3px;">'+(d===0?'termina hoje':'faltam '+d+' dia(s)')+' · 1º PDI: '+_devCicloLabel(_devPrimeiroCicloApos(r.fim))+'</div>';}
     else sit=_devBadge('#dcfce7','#166534','✓ Experiência concluída')+(r.fim?'<div style="font-size:11px;color:#888;margin-top:3px;">1º PDI: '+_devCicloLabel(_devPrimeiroCicloApos(r.fim))+'</div>':'');
     h+='<tr><td>'+_devPessoa(r.f,_devH((r.f.cargo||'')+' · '+_devSetor(r.f)))+'</td><td>'+fmtData(r.f.admissao)+'</td>'
       +'<td>'+_devExpChip(r.f,'45')+'</td><td>'+_devExpChip(r.f,'90')+'</td><td>'+sit+'</td>'
@@ -7816,8 +7794,7 @@ function _devAlertasHTML(){
     var st=_devStatusCiclo(atual),eleg=st.lista.filter(function(r){return r.sit!=='desligado';}),pend=eleg.filter(function(r){return r.sit!=='feito';});
     if(pend.length){
       h+='<div class="card so-admin" style="border-left:4px solid #0ea5e9;margin-bottom:14px;"><div class="card-title"><span class="dot" style="background:#0ea5e9;"></span>🔄 Ciclo de PDI '+_devCicloLabel(atual)+' — '+(eleg.length-pend.length)+' de '+eleg.length+' feitos · '+pend.length+' pendente(s)</div>'
-        +'<div style="display:flex;gap:6px;flex-wrap:wrap;">'+pend.slice(0,24).map(function(r){return _devBadge('#fef3c7','#92400e',_devH(r.f.nome));}).join('')+(pend.length>24?_devBadge('#f1f5f9','#64748b','+'+(pend.length-24)):'')+'</div>'
-        +'<button class="btn btn-sm btn-outline" style="margin-top:10px;" onclick="devIrPara(\'ciclo\')">Ver ciclo</button></div>';
+        +'<button class="btn btn-sm btn-outline" onclick="devIrPara(\'ciclo\')">Ver ciclo</button></div>';
     }
   }
   if(prox){
