@@ -507,7 +507,7 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
 <div id="modal-afastamento-vtvr" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;align-items:center;justify-content:center;" onclick="if(event.target===this)fecharAfastamentoVTVR()">
   <div style="background:#fff;border-radius:16px;max-width:380px;width:95%;">
     <div style="padding:14px 18px;border-bottom:1px solid #e2e6f0;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:15px;font-weight:700;color:#11205b;">🏥 Afastamento</div>
+      <div style="font-size:15px;font-weight:700;color:#11205b;">📅 Afastamento e dias extras</div>
       <button onclick="fecharAfastamentoVTVR()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>
     </div>
     <div style="padding:16px 18px;">
@@ -522,6 +522,17 @@ body.perfil-assistente .perfil-badge{display:inline-block;background:#fff7ed;col
           <label>Dias a abater do VR</label>
           <input type="number" id="afas-vr" min="0" placeholder="0" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;"/>
           <small style="color:#888;font-size:11px;">Todos os dias úteis perdidos</small>
+        </div>
+      </div>
+      <div style="border-top:1px dashed #d5daea;margin-top:12px;padding-top:12px;">
+        <div class="form-group" style="margin-bottom:10px;">
+          <label>Dias a mais de VT</label>
+          <input type="number" id="afas-vt-extra" min="0" placeholder="0" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;"/>
+          <small style="color:#888;font-size:11px;">Dias presenciais além da escala (ex.: veio num dia de home office)</small>
+        </div>
+        <div class="form-group">
+          <label>Observação (opcional)</label>
+          <input type="text" id="afas-obs" maxlength="200" placeholder="Ex.: veio presencial dia 12 para reunião" style="padding:8px;border:1px solid #d5daea;border-radius:8px;font-size:13px;width:100%;box-sizing:border-box;"/>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;">
@@ -8594,23 +8605,28 @@ function calcularVTVR(){
     var ferias=calcularDiasFerias(f.id,mes,ano,diasDoMes,presenciais);
     var afasKey=f.id+'_'+mes+'_'+ano;
     var afas=savedAfas[afasKey]||{afasVT:0,afasVR:0};
-    var diasVT=Math.max(0,diasVTBruto-ferias.diasFeriasVT-(afas.afasVT||0));
+    var extraVT=parseInt(afas.extraVT)||0;
+    var diasVT=Math.max(0,diasVTBruto-ferias.diasFeriasVT-(afas.afasVT||0))+extraVT;
     var diasVR=Math.max(0,diasUteisTotal-ferias.diasFeriasVR-(afas.afasVR||0));
     var totalFuncVT=diasVT*(vtIda+vtVolta),totalFuncVR=diasVR*vrDia;
     totalVT+=totalFuncVT; totalVR+=totalFuncVR;
     _vtvrCalculo[f.id]={funcId:f.id,funcNome:f.nome,diasVTBruto:diasVTBruto,
       diasFeriasVT:ferias.diasFeriasVT,diasFeriasVR:ferias.diasFeriasVR,
-      afasVT:afas.afasVT||0,afasVR:afas.afasVR||0,
+      afasVT:afas.afasVT||0,afasVR:afas.afasVR||0,extraVT:extraVT,obsAjuste:afas.obs||'',
       diasVT:diasVT,diasVR:diasVR,diasUteisTotal:diasUteisTotal,
       vtIda:vtIda,vtVolta:vtVolta,vrDia:vrDia,
       totalVT:totalFuncVT,totalVR:totalFuncVR,total:totalFuncVT+totalFuncVR};
     var escalaStr=presenciais.map(function(d){return nomeDias[d]||'';}).join('/')||'--';
-    var afasLabel=(afas.afasVT||afas.afasVR)?'Afas: '+(afas.afasVT||0)+'vt/'+(afas.afasVR||0)+'vr':'+ Afas.';
+    var _partesAj=[];
+    if(afas.afasVT||afas.afasVR)_partesAj.push('Afas: '+(afas.afasVT||0)+'vt/'+(afas.afasVR||0)+'vr');
+    if(extraVT)_partesAj.push('Extra: +'+extraVT+'vt');
+    var afasLabel=_partesAj.length?_partesAj.join(' · '):'+ Afas./Extra';
+    var _obsAj=String(afas.obs||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
     rows+='<tr style="border-bottom:1px solid #e2e6f0;">'
       +'<td style="padding:8px 12px;font-size:12px;font-weight:600;">'+f.nome+'<br><span style="font-size:10px;color:#888;">'+f.cargo+'</span></td>'
       +'<td style="text-align:center;font-size:12px;">'+escalaStr+'</td>'
-      +'<td style="text-align:center;font-size:12px;">'+diasVT+'<span style="color:#888;font-size:10px;"> /'+diasVTBruto+'</span></td>'
-      +'<td style="text-align:center;"><button class="vtvr-afas-btn" data-fid="'+f.id+'" style="background:#f0f4ff;border:1px solid #d5daea;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;">'+afasLabel+'</button></td>'
+      +'<td style="text-align:center;font-size:12px;">'+diasVT+'<span style="color:#888;font-size:10px;"> /'+diasVTBruto+'</span>'+(extraVT?'<span style="color:#16a34a;font-size:10px;font-weight:700;"> (+'+extraVT+')</span>':'')+'</td>'
+      +'<td style="text-align:center;"><button class="vtvr-afas-btn" data-fid="'+f.id+'"'+(_obsAj?' title="'+_obsAj+'"':'')+' style="background:'+(extraVT?'#ecfdf5':'#f0f4ff')+';border:1px solid #d5daea;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;">'+afasLabel+(_obsAj?' 📝':'')+'</button></td>'
       +'<td style="text-align:center;font-size:12px;">'+diasVR+'<span style="color:#888;font-size:10px;"> /'+diasUteisTotal+'</span></td>'
       +'<td style="text-align:right;font-size:12px;font-weight:600;color:#11205b;">'+fmtMoeda(totalFuncVT)+'</td>'
       +'<td style="text-align:right;font-size:12px;font-weight:600;color:#f94603;">'+fmtMoeda(totalFuncVR)+'</td>'
@@ -8638,6 +8654,8 @@ function abrirAfastamentoVTVR(funcId){
   var afas=(getAfastamentosVTVR()[afasKey])||{afasVT:0,afasVR:0};
   document.getElementById('afas-vt').value=afas.afasVT||0;
   document.getElementById('afas-vr').value=afas.afasVR||0;
+  document.getElementById('afas-vt-extra').value=afas.extraVT||0;
+  document.getElementById('afas-obs').value=afas.obs||'';
   document.getElementById('modal-afastamento-vtvr').style.display='flex';
 }
 function fecharAfastamentoVTVR(){
@@ -8648,11 +8666,12 @@ function salvarAfastamentoVTVR(){
   if(!_vtvrAfastamentoFuncId) return;
   var afasKey=_vtvrAfastamentoFuncId+'_'+_vtvrMesAtual+'_'+_vtvrAnoAtual;
   var saved=getAfastamentosVTVR();
-  saved[afasKey]={afasVT:parseInt(document.getElementById('afas-vt').value)||0,afasVR:parseInt(document.getElementById('afas-vr').value)||0};
+  saved[afasKey]={afasVT:Math.max(0,parseInt(document.getElementById('afas-vt').value)||0),afasVR:Math.max(0,parseInt(document.getElementById('afas-vr').value)||0),
+    extraVT:Math.max(0,parseInt(document.getElementById('afas-vt-extra').value)||0),obs:String(document.getElementById('afas-obs').value||'').trim()};
   saveAfastamentosVTVR(saved);
   fecharAfastamentoVTVR();
   calcularVTVR();
-  toast('Afastamento salvo!');
+  toast('Ajuste salvo!');
 }
 
 function abrirFeriados(){renderListaFeriados();document.getElementById('modal-feriados').style.display='flex';}
@@ -8869,11 +8888,11 @@ function exportarVTVRExcel(){
   if(!_vtvrMesAtual||Object.keys(_vtvrCalculo).length===0){toast('Calcule primeiro.');return;}
   var meses=['','Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var nomeDias=['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
-  var rows=[['Funcionario','Cargo','Escala','Dias VT Bruto','Ferias VT','Afas. VT','Dias VT Liq.','VT Ida','VT Volta','Total VT','Dias Uteis','Ferias VR','Afas. VR','Dias VR Liq.','VR/dia','Total VR','Total Geral']];
+  var rows=[['Funcionario','Cargo','Escala','Dias VT Bruto','Ferias VT','Afas. VT','Dias extras VT','Dias VT Liq.','VT Ida','VT Volta','Total VT','Dias Uteis','Ferias VR','Afas. VR','Dias VR Liq.','VR/dia','Total VR','Total Geral','Obs. ajuste']];
   Object.values(_vtvrCalculo).forEach(function(c){
     var f=funcionarios.find(function(x){return x.id===c.funcId;})||{};
     var escala=(f.diasPresenciais||[]).map(function(d){return nomeDias[d]||'';}).join('/');
-    rows.push([c.funcNome,f.cargo||'',escala,c.diasVTBruto,c.diasFeriasVT,c.afasVT,c.diasVT,c.vtIda,c.vtVolta,c.totalVT,c.diasUteisTotal,c.diasFeriasVR,c.afasVR,c.diasVR,c.vrDia,c.totalVR,c.total]);
+    rows.push([c.funcNome,f.cargo||'',escala,c.diasVTBruto,c.diasFeriasVT,c.afasVT,c.extraVT||0,c.diasVT,c.vtIda,c.vtVolta,c.totalVT,c.diasUteisTotal,c.diasFeriasVR,c.afasVR,c.diasVR,c.vrDia,c.totalVR,c.total,c.obsAjuste||'']);
   });
   var BOM='\uFEFF';
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(';');}).join('\n');
@@ -9571,7 +9590,7 @@ setTimeout(function(){
           <th style="padding:10px 12px;text-align:left;font-size:12px;">Funcionário</th>
           <th style="padding:10px 12px;text-align:center;font-size:12px;">Escala</th>
           <th style="padding:10px 12px;text-align:center;font-size:12px;">Dias VT</th>
-          <th style="padding:10px 12px;text-align:center;font-size:12px;">Afastamento</th>
+          <th style="padding:10px 12px;text-align:center;font-size:12px;">Afastamento / Extra</th>
           <th style="padding:10px 12px;text-align:center;font-size:12px;">Dias VR</th>
           <th style="padding:10px 12px;text-align:right;font-size:12px;">VT (R$)</th>
           <th style="padding:10px 12px;text-align:right;font-size:12px;">VR (R$)</th>
