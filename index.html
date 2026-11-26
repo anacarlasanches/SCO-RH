@@ -1584,9 +1584,16 @@ function addFuncionario(){
   ['f-nome','f-cargo'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-admissao').value='';
   toast('Funcionário cadastrado!');
-  // Abrir checklist de admissão
+  // Abrir checklist de admissão — já fica salvo como pendente (⚠️ na lista) até ser concluído
   var novoFunc = funcionarios[funcionarios.length-1];
-  if(novoFunc) setTimeout(function(){abrirChecklistAdmissao(novoFunc.id);},400);
+  if(novoFunc){
+    var _tipoAdm = (novoFunc.tipo==='PJ'||novoFunc.tipo==='Autônomo') ? 'admissao_PJ' : 'admissao_CLT';
+    if(!getChecklistFunc(novoFunc.id,_tipoAdm)){
+      var _tplA=(getChecklistTemplates()[_tipoAdm]||[]).map(function(label){return {label:label,done:false};});
+      if(_tplA.length) saveChecklistFunc(novoFunc.id,_tipoAdm,_tplA);
+    }
+    setTimeout(function(){abrirChecklistAdmissao(novoFunc.id);},400);
+  }
 }
 function verFuncionario(id){
   const f = funcionarios.find(f=>f.id===id);
@@ -1690,10 +1697,14 @@ function verFuncionario(id){
     html += '<div style="margin-top:12px;"><button class="btn btn-sm btn-orange" onclick="gerarDocumentosAdmissao(\''+f.id+'\')">📄 Gerar documentos de admissão</button></div>';
   }
   // Botões de checklist e ações
-  if(funcTemChecklistPendente(f.id) || f.ativo===false){
+  var _ckPend = funcTemChecklistPendente(f.id);
+  var _admRecente = f.ativo!==false && (!f.admissao || (Date.now()-new Date(f.admissao+'T00:00:00').getTime())/864e5<=90);
+  if(_ckPend || f.ativo===false || _admRecente){
     html += '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">';
-    if(funcTemChecklistPendente(f.id)){
+    if(_ckPend){
       html += '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="closeModal();setTimeout(function(){abrirChecklistPendente(\''+f.id+'\');},200);">⚠️ Ver Checklist Pendente</button>';
+    } else if(_admRecente){
+      html += '<button class="btn btn-sm btn-outline" onclick="closeModal();setTimeout(function(){abrirChecklistAdmissao(\''+f.id+'\');},200);">📋 Abrir checklist de admissão</button>';
     }
     if(f.ativo===false && !_ehAutonomoFunc(f)){
       html += '<button class="btn btn-sm btn-orange" onclick="closeModal();setTimeout(function(){abrirRescisao(\''+f.id+'\');},200);">💰 Lançar/Editar Rescisão</button>';
@@ -1799,6 +1810,7 @@ function salvarEditFunc(){
     if(el) funcionarios[idx][c] = c==='salario'?parseFloat(el.value)||0:el.value;
   });
   save();
+  try{_ajustarChecklistAdmissao(funcionarios[idx]);}catch(e){}
   renderFuncionarios();
   populateFuncSelect();
   try{renderMetas();}catch(e){}
@@ -8290,11 +8302,35 @@ function funcTemChecklistPendente(funcId){
 
 var _checklistAtual = null;
 
+// Se o checklist de admissão pendente é de outro tipo (cadastrou como CLT e depois mudou para PJ, por exemplo)
+// e ainda não teve nenhuma tarefa marcada, troca pelo modelo do tipo atual.
+function _ajustarChecklistAdmissao(f){
+  if(!f||f.ativo===false) return null;
+  var tipo=(f.tipo==='PJ'||f.tipo==='Autônomo')?'admissao_PJ':'admissao_CLT';
+  var outro=tipo==='admissao_PJ'?'admissao_CLT':'admissao_PJ';
+  var velho=getChecklistFunc(f.id,outro);
+  if(!velho||getChecklistFunc(f.id,tipo)) return null;
+  if((velho.items||[]).some(function(i){return i.done;})) return null; // já começou: não mexe
+  var novos=(getChecklistTemplates()[tipo]||[]).map(function(label){return {label:label,done:false};});
+  function aplicar(prog){ delete prog[f.id+'_'+outro]; if(novos.length) prog=_aplicarChecklist(prog,f.id,tipo,novos); return prog; }
+  localStorage.setItem('rt_checklist_progresso', JSON.stringify(aplicar(getChecklistProgresso())));
+  try{
+    supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').maybeSingle().then(function(r){
+      var remoto=(r&&r.data&&r.data.valor)?r.data.valor:getChecklistProgresso();
+      var final=aplicar(remoto);
+      localStorage.setItem('rt_checklist_progresso', JSON.stringify(final));
+      return supa.from('configuracoes').upsert([{chave:'checklist_progresso',valor:final}]);
+    }).then(function(r2){ if(r2&&r2.error) toast('⚠️ Checklist salvo só neste navegador — não consegui salvar na nuvem.', false); });
+  }catch(e){}
+  return tipo;
+}
+
 function abrirChecklistAdmissao(funcId){
   var f = funcionarios.find(function(x){return x.id===funcId;});
   if(!f) return;
   // Se func desligada, não abrir admissão
   if(f.ativo===false) return;
+  try{_ajustarChecklistAdmissao(f);}catch(e){}
   var tipo = (f.tipo==='PJ'||f.tipo==='Autônomo') ? 'admissao_PJ' : 'admissao_CLT';
   var salvo = getChecklistFunc(funcId, tipo);
   var templates = getChecklistTemplates();
