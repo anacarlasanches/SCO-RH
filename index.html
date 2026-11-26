@@ -1594,7 +1594,7 @@ function verFuncionario(id){
   const fi = funcionarios.indexOf(f);
   const campos = [
     ['Tipo contratação', f.tipo],
-    ehAssistente()?null:['Salário base', 'R$ '+Number(f.salario||0).toLocaleString('pt-BR',{minimumFractionDigits:2})],
+    ['Salário base', 'R$ '+Number(f.salario||0).toLocaleString('pt-BR',{minimumFractionDigits:2})],
     ['Nível', f.nivel],
     ['Meta', f.meta],
     ['Data admissão', fmtData(f.admissao)],
@@ -1660,9 +1660,7 @@ function verFuncionario(id){
 
   // Histórico salarial do funcionário
   const histFunc = historico.filter(function(h){
-    if(h.funcId!==f.id) return false;
-    if(ehAssistente() && /sal[aá]rio|R\$/i.test((h.tipo||'')+' '+(h.anterior||'')+' '+(h.novo||''))) return false;
-    return true;
+    return h.funcId===f.id;
   }).slice(0,5);
   if(histFunc.length){
     html += '<div style="background:#f7f9ff;border:1px solid #e2e6f0;border-radius:8px;padding:12px;margin-top:12px;">'
@@ -1683,8 +1681,8 @@ function verFuncionario(id){
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
       +'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Data demissão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmtData(f.demissao.data)+'</div></div>'
       +'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Tipo rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+f.demissao.tipo+'</div></div>'
-      +(f.demissao.valor&&!ehAssistente()?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Valor rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.valor)+'</div></div>':'')
-      +(f.demissao.fgtsRescisorio&&!ehAssistente()?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">FGTS rescisório</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.fgtsRescisorio)+'</div></div>':'')
+      +(f.demissao.valor?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">Valor rescisão</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.valor)+'</div></div>':'')
+      +(f.demissao.fgtsRescisorio?'<div style="background:#fff;border-radius:6px;padding:8px 10px;"><div style="font-size:10px;color:#888;font-weight:700;text-transform:uppercase;">FGTS rescisório</div><div style="font-size:13px;font-weight:600;color:#dc2626;">'+fmt(f.demissao.fgtsRescisorio)+'</div></div>':'')
       +'</div></div>';
   }
   // Documentos de admissão (CLT ativo)
@@ -1697,7 +1695,7 @@ function verFuncionario(id){
     if(funcTemChecklistPendente(f.id)){
       html += '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;" onclick="closeModal();setTimeout(function(){abrirChecklistPendente(\''+f.id+'\');},200);">⚠️ Ver Checklist Pendente</button>';
     }
-    if(f.ativo===false && !ehAssistente() && !_ehAutonomoFunc(f)){
+    if(f.ativo===false && !_ehAutonomoFunc(f)){
       html += '<button class="btn btn-sm btn-orange" onclick="closeModal();setTimeout(function(){abrirRescisao(\''+f.id+'\');},200);">💰 Lançar/Editar Rescisão</button>';
     }
     html += '</div>';
@@ -1978,7 +1976,7 @@ function renderFuncionarios(){
       +'<td><code style="background:var(--sco-azul-light);color:var(--sco-azul);padding:2px 6px;border-radius:4px;font-size:11px;">'+fmtData(f.admissao)+'</code></td>'
       +'<td><div style="display:flex;gap:5px;">'
       +'<button class="btn btn-outline btn-sm" onclick="verFuncionario(\''+f.id+'\')">👁️</button>'
-      +(ehAssistente()?'':'<button class="btn btn-warning btn-sm" onclick="editarFuncionario(\''+f.id+'\')">✏️</button>'+btnStatus)
+      +'<button class="btn btn-warning btn-sm" onclick="editarFuncionario(\''+f.id+'\')">✏️</button>'+btnStatus
       +'<button class="btn btn-danger btn-sm" onclick="removeFuncionario(\''+f.id+'\')">🗑️</button>'
       +'</div></td>'
       +'</tr>';
@@ -6020,7 +6018,7 @@ function exportarFuncionariosExcel(){
   }).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
   var nomeFiltro=filtro==='desligados'?'Desligados':filtro==='todos'?'Todos':'Ativos';
   var rows=[['Nome','Cargo','Departamento','Tipo','Nivel','Salario','Admissao','Nascimento','Sexo','Raca Cor','CPF','RG','Celular','Email Corp','Endereco','Status','Data Desligamento','Motivo do Desligamento']];
-  var _semSal=ehAssistente();
+  var _semSal=false; // assistente também vê salário na aba Funcionários
   list.forEach(function(f){rows.push([f.nome||'',f.cargo||'',f.depto||'',f.tipo||'CLT',f.nivel||'',f.salario||0,f.admissao||'',f.nascimento||'',f.sexo||'',f.raca_cor||'',f.cpf||'',f.rg||'',f.celular||'',f.email_corp||'',f.endereco||'',f.ativo===false?(_ehAutonomoFunc(f)?'Desativado':'Desligado'):'Ativo',
     f.ativo===false?fmtData((f.demissao&&f.demissao.data)||f.desativadoEm||f.dataDesligamento||''):'',
     f.ativo===false?((f.demissao&&f.demissao.tipo)||''):'']);});
@@ -7840,7 +7838,7 @@ var _perfilAtual='assistente'; // começa restrito até confirmar o login
 var PAGINAS_BLOQUEADAS_ASSISTENTE=['dashboard','relatorio','lancamento','historico','relatorios','importacoes','planilha','importar-enc','configuracoes'];
 // Ações de escrita bloqueadas para o assistente (abas "só ver" e funções só da coordenação)
 var ACOES_BLOQUEADAS_ASSISTENTE=[
-  'editarFuncionario','salvarEditFunc','desativarFuncionario','desativarAutonomo','reativarFuncionario','removeFuncionario','abrirRescisao','salvarRescisao',
+  // Aba Funcionários: liberada por completo para o assistente (cadastrar, editar, ver salário, desligar, rescisão).
   // Aba Férias: liberada por completo para o assistente. Importações de férias continuam só na coordenação.
   'handleXLSXFeriasCompleto','confirmarImportFeriasCompleto','handleCSVFerias',
   'salvarMeta','removerMeta','importarMetasPlanilha',
