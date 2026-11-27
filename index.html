@@ -3794,17 +3794,47 @@ function renderAlertas(){
       var f=funcionarios.find(function(x){return x.id===fid;});
       if(!f)return null;
       var it=prog[k].items||[];var feitos=it.filter(function(i){return i.done;}).length;
-      return {f:f,feitos:feitos,total:it.length};
+      return {f:f,feitos:feitos,total:it.length,falta:it.filter(function(i){return !i.done;}).map(function(i){return i.label;})};
     }).filter(Boolean).sort(function(a,b){return ((b.f.demissao&&b.f.demissao.data)||'').localeCompare((a.f.demissao&&a.f.demissao.data)||'');});
     if(!pend.length)return;
     html+='<div class="card" style="border-left:4px solid #dc2626;margin-bottom:14px;">'
       +'<div class="card-title"><span class="dot" style="background:#dc2626;"></span>📋 Checklists de desligamento pendentes — '+pend.length+'</div>'
       +pend.map(function(p){
         var pct=p.total?Math.round(p.feitos/p.total*100):0;
+        var falta=p.falta.slice(0,4).join(' · ')+(p.falta.length>4?' · +'+(p.falta.length-4):'');
         return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f3f9;flex-wrap:wrap;">'
-          +'<div style="flex:1;min-width:180px;"><div style="font-weight:700;font-size:13px;">'+p.f.nome+'</div>'
-          +'<div style="font-size:11px;color:#888;">'+(p.f.cargo||'')+(p.f.demissao&&p.f.demissao.data?' · desligado em '+fmtData(p.f.demissao.data):'')+'</div></div>'
+          +'<div style="flex:1;min-width:220px;"><div style="font-weight:700;font-size:13px;">'+p.f.nome+'</div>'
+          +'<div style="font-size:11px;color:#888;">'+(p.f.cargo||'')+(p.f.demissao&&p.f.demissao.data?' · desligado em '+fmtData(p.f.demissao.data):'')+'</div>'
+          +(falta?'<div style="font-size:12px;color:#b91c1c;margin-top:3px;"><b>Falta:</b> '+falta+'</div>':'')+'</div>'
           +'<div style="width:140px;"><div style="height:6px;background:#f1f3f9;border-radius:4px;overflow:hidden;"><div style="height:6px;width:'+pct+'%;background:#f94603;"></div></div>'
+          +'<div style="font-size:11px;color:#666;margin-top:3px;">'+p.feitos+' de '+p.total+' tarefas</div></div>'
+          +'<button class="btn btn-sm btn-orange" onclick="abrirChecklistPendente(\''+p.f.id+'\')">✅ Abrir checklist</button>'
+          +'</div>';
+      }).join('')
+      +'</div>';
+  })();
+
+  // 0b. Checklists de admissão pendentes (mostra o que falta)
+  (function(){
+    var prog=getChecklistProgresso();
+    var pend=Object.keys(prog).filter(function(k){return prog[k]&&(prog[k].tipo==='admissao_CLT'||prog[k].tipo==='admissao_PJ');}).map(function(k){
+      var fid=k.slice(0,k.length-('_'+prog[k].tipo).length);
+      var f=funcionarios.find(function(x){return x.id===fid;});
+      if(!f||f.ativo===false)return null;
+      var it=prog[k].items||[];
+      return {f:f,feitos:it.filter(function(i){return i.done;}).length,total:it.length,falta:it.filter(function(i){return !i.done;}).map(function(i){return i.label;})};
+    }).filter(Boolean).sort(function(a,b){return (b.f.admissao||'').localeCompare(a.f.admissao||'');});
+    if(!pend.length)return;
+    html+='<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:14px;">'
+      +'<div class="card-title"><span class="dot" style="background:#f59e0b;"></span>📋 Checklists de admissão pendentes — '+pend.length+'</div>'
+      +pend.map(function(p){
+        var pct=p.total?Math.round(p.feitos/p.total*100):0;
+        var falta=p.falta.slice(0,4).join(' · ')+(p.falta.length>4?' · +'+(p.falta.length-4):'');
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f3f9;flex-wrap:wrap;">'
+          +'<div style="flex:1;min-width:220px;"><div style="font-weight:700;font-size:13px;">'+p.f.nome+'</div>'
+          +'<div style="font-size:11px;color:#888;">'+(p.f.cargo||'')+(p.f.admissao?' · admissão em '+fmtData(p.f.admissao):'')+'</div>'
+          +(falta?'<div style="font-size:12px;color:#92400e;margin-top:3px;"><b>Falta:</b> '+falta+'</div>':'')+'</div>'
+          +'<div style="width:140px;"><div style="height:6px;background:#f1f3f9;border-radius:4px;overflow:hidden;"><div style="height:6px;width:'+pct+'%;background:#f59e0b;"></div></div>'
           +'<div style="font-size:11px;color:#666;margin-top:3px;">'+p.feitos+' de '+p.total+' tarefas</div></div>'
           +'<button class="btn btn-sm btn-orange" onclick="abrirChecklistPendente(\''+p.f.id+'\')">✅ Abrir checklist</button>'
           +'</div>';
