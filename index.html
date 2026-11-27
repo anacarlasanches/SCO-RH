@@ -1528,7 +1528,7 @@ function goTo(page,el){
   if(page==='planilha'){document.getElementById('plan-mes').value=new Date().getMonth()+1;}
   if(page==='importar-enc'){encPdfDados={};}
   if(page==='rh') renderRH();
-  if(page==='alertas'){ renderAlertas(); Promise.all([_atualizarChecklistsDaNuvem(),_devCarregar()]).then(function(){ try{renderAlertas();}catch(e){} }); }
+  if(page==='alertas'){ renderAlertas(); Promise.all([_atualizarChecklistsDaNuvem(),_devCarregar()]).then(function(){ return _salvarAjustesAdmissao(funcionarios.filter(function(f){return f.ativo!==false;})); }).catch(function(){}).then(function(){ try{renderAlertas();}catch(e){} }); }
   if(page==='ferias-ctrl') renderFeriasCtrl();
   if(page==='vt-vr'){renderHistoricoVTVR();renderHistoricoCartoes();}
   if(page==='historico'){
@@ -8290,6 +8290,9 @@ function getChecklistFunc(funcId, tipo){
 }
 function _aplicarChecklist(prog, funcId, tipo, items){
   var key = funcId+'_'+tipo;
+  // Cada pessoa tem um só checklist de admissão (o do tipo atual): salvar um apaga o do outro tipo
+  if(tipo==='admissao_CLT') delete prog[funcId+'_admissao_PJ'];
+  if(tipo==='admissao_PJ') delete prog[funcId+'_admissao_CLT'];
   var total = items.length;
   var feitos = items.filter(function(i){return i.done;}).length;
   if(feitos===total && total>0){
@@ -8332,28 +8335,38 @@ function funcTemChecklistPendente(funcId){
 
 var _checklistAtual = null;
 
-// Se o checklist de admissão pendente é de outro tipo (cadastrou como CLT e depois mudou para PJ, por exemplo)
-// e ainda não teve nenhuma tarefa marcada, troca pelo modelo do tipo atual.
-function _ajustarChecklistAdmissao(f){
-  if(!f||f.ativo===false) return null;
-  var tipo=(f.tipo==='PJ'||f.tipo==='Autônomo')?'admissao_PJ':'admissao_CLT';
-  var outro=tipo==='admissao_PJ'?'admissao_CLT':'admissao_PJ';
-  var velho=getChecklistFunc(f.id,outro);
-  if(!velho||getChecklistFunc(f.id,tipo)) return null;
-  if((velho.items||[]).some(function(i){return i.done;})) return null; // já começou: não mexe
-  var novos=(getChecklistTemplates()[tipo]||[]).map(function(label){return {label:label,done:false};});
-  function aplicar(prog){ delete prog[f.id+'_'+outro]; if(novos.length) prog=_aplicarChecklist(prog,f.id,tipo,novos); return prog; }
-  localStorage.setItem('rt_checklist_progresso', JSON.stringify(aplicar(getChecklistProgresso())));
-  try{
-    supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').maybeSingle().then(function(r){
-      var remoto=(r&&r.data&&r.data.valor)?r.data.valor:getChecklistProgresso();
-      var final=aplicar(remoto);
-      localStorage.setItem('rt_checklist_progresso', JSON.stringify(final));
-      return supa.from('configuracoes').upsert([{chave:'checklist_progresso',valor:final}]);
-    }).then(function(r2){ if(r2&&r2.error) toast('⚠️ Checklist salvo só neste navegador — não consegui salvar na nuvem.', false); });
-  }catch(e){}
-  return tipo;
+// Se existe checklist de admissão de outro tipo (cadastrou como CLT e depois mudou para PJ, por exemplo),
+// troca pelo checklist do tipo atual, mantendo marcadas as tarefas com o mesmo nome. Se o do tipo atual já existe, só apaga o antigo.
+function _tipoAdmissaoDe(f){return (f.tipo==='PJ'||f.tipo==='Autônomo')?'admissao_PJ':'admissao_CLT';}
+function _ajusteAdmissaoNoProg(prog,f,templates){
+  if(!f||f.ativo===false) return false;
+  var tipo=_tipoAdmissaoDe(f), outro=tipo==='admissao_PJ'?'admissao_CLT':'admissao_PJ';
+  var velho=prog[f.id+'_'+outro];
+  if(!velho) return false;
+  if(prog[f.id+'_'+tipo]){ delete prog[f.id+'_'+outro]; return true; }
+  var feitos={};(velho.items||[]).forEach(function(i){ if(i&&i.done) feitos[normTxt(i.label)]=1; });
+  var novos=(templates[tipo]||[]).map(function(label){return {label:label,done:!!feitos[normTxt(label)]};});
+  delete prog[f.id+'_'+outro];
+  if(novos.length) _aplicarChecklist(prog,f.id,tipo,novos);
+  return true;
 }
+function _salvarAjustesAdmissao(lista){
+  var tpl=getChecklistTemplates();
+  function aplicar(prog){ var mudou=false; lista.forEach(function(f){ if(_ajusteAdmissaoNoProg(prog,f,tpl)) mudou=true; }); return mudou; }
+  var local=getChecklistProgresso();
+  if(!aplicar(local)) return Promise.resolve(false);
+  localStorage.setItem('rt_checklist_progresso', JSON.stringify(local));
+  try{
+    return supa.from('configuracoes').select('valor').eq('chave','checklist_progresso').maybeSingle().then(function(r){
+      var remoto=(r&&r.data&&r.data.valor)?r.data.valor:getChecklistProgresso();
+      aplicar(remoto);
+      localStorage.setItem('rt_checklist_progresso', JSON.stringify(remoto));
+      return supa.from('configuracoes').upsert([{chave:'checklist_progresso',valor:remoto}]);
+    }).then(function(r2){ if(r2&&r2.error) toast('⚠️ Checklist salvo só neste navegador — não consegui salvar na nuvem.', false); return true; })
+    .catch(function(){ return true; });
+  }catch(e){ return Promise.resolve(true); }
+}
+function _ajustarChecklistAdmissao(f){ return _salvarAjustesAdmissao([f]); }
 
 function abrirChecklistAdmissao(funcId){
   var f = funcionarios.find(function(x){return x.id===funcId;});
